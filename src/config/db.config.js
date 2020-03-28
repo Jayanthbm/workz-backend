@@ -1,6 +1,6 @@
 module.exports = {
-    host: "localhost",
-    user: "root",
-    password: "",
-    database: "workz"
+    host: "remotemysql.com",
+    user: "DFfAQ5gSJX",
+    password: "X37IXP7eqW",
+    database: "DFfAQ5gSJX"
 };
