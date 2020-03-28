@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const CC = require('../constants');
 
 //Middlewares
-const auth = require('../middlwares/auth');
+const auth = require('../middlewares/auth');
 
 router.get("/", async (req, res) => {
     res.send({
