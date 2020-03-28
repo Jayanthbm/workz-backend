@@ -8,6 +8,11 @@ const CC = require('../constants');
 //Middlewares
 const auth = require('../middlwares/auth');
 
+router.get("/", async (req, res) => {
+    res.send({
+        message: "Hello world"
+    })
+})
 //Login Route
 
 router.post("/login", async (req, res) => {
