@@ -17,7 +17,7 @@ module.exports = (req, res, next) => {
                 message: "You must be logged in."
             });
         }
-        req.managerid = payload.managerid;
+        req.userId = payload.userId;
         next();
     });
 };
