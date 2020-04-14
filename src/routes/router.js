@@ -316,11 +316,8 @@ router.get("/manager/:userid", auth, async (req, res) => {
         let mainteams = teamresultsquery.results;
         results.push(mainteams);
         for (let i = 0; i < mainteams.length; i++) {
-            results[0][i].managers = [];
             let managers = await get_managers(mainteams[i].teamId);
-            for (let j = 0; j < managers.length; j++) {
-                results[0][i].managers.push([managers[j]])
-            }
+            results[0][i].managers = managers;
             let managersummary = await manager_summary(mainteams[i].teamId);
             if (managersummary.length > 0) {
                 // for (let k = 0; k < managersummary.length; k++) {
