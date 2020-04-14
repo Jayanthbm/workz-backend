@@ -316,9 +316,17 @@ router.get("/manager/:userid", auth, async (req, res) => {
         let mainteams = teamresultsquery.results;
         results.push(mainteams);
         for (let i = 0; i < mainteams.length; i++) {
+            results[0][i].managers = [];
             let managers = await get_managers(mainteams[i].teamId);
-            results[0][i].managers = managers;
+            for (let j = 0; j < managers.length; j++) {
+                results[0][i].managers.push([managers[j]])
+            }
             let managersummary = await manager_summary(mainteams[i].teamId);
+            if (managersummary.length > 0) {
+                // for (let k = 0; k < managersummary.length; k++) {
+                //     console.log(results[0][i].managers[k])
+                // }
+            }
             results[0][i].summary = managersummary;
             let users = await get_users(mainteams[i].teamId);
             results[0][i].users = users;
@@ -328,31 +336,32 @@ router.get("/manager/:userid", auth, async (req, res) => {
             results
         })
     } else {
-        const teamquery = `SELECT name from team WHERE teamId = ${teamId}`;
+        const teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
         let teamqueryResults = await db.query(teamquery);
-        let teamName = teamqueryResults.results[0].name;
-        const sql3 = `SELECT userId,empId,emailId,teamId,startDate,name,firstname,profilePic,profileThumbnailUrl,isManager,isActive,onlineStatus from user WHERE teamId = ${teamId}`;
-        let teamusersquery = await db.query(sql3);
-        let teamusers = teamusersquery.results;
+        results.push(teamqueryResults.results[0]);
+        let managers = await get_managers(teamqueryResults.results[0].teamId);
+        results[0].managers = managers;
+        let users = await get_users(teamqueryResults.results[0].teamId);
+        results[0].users = users;
         res.send({
-            teamName,
-            teamusers,
+            results,
         })
     }
 
 })
 
 router.get("/teams/:teamid", auth, async (req, res) => {
+    let results = [];
     let teamId = req.params.teamid;
-    const teamquery = `SELECT name from team WHERE teamId = ${teamId}`;
+    const teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
     let teamqueryResults = await db.query(teamquery);
-    let teamName = teamqueryResults.results[0].name;
-    const sql3 = `SELECT userId,empId,emailId,teamId,startDate,name,firstname,profilePic,profileThumbnailUrl,isManager,isActive,onlineStatus from user WHERE teamId = ${teamId}`;
-    let teamusersquery = await db.query(sql3);
-    let teamusers = teamusersquery.results;
+    results.push(teamqueryResults.results[0]);
+    let managers = await get_managers(teamqueryResults.results[0].teamId);
+    results[0].managers = managers;
+    let users = await get_users(teamqueryResults.results[0].teamId);
+    results[0].users = users;
     res.send({
-        teamName,
-        teamusers,
+        results,
     })
 })
 
