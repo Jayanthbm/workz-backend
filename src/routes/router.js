@@ -50,8 +50,42 @@ router.post("/submitform", async (req, res) => {
 
 })
 
+
+let dropdown = [];
+function update_dropdown(id, name) {
+    dropdown.push({
+        "id": id,
+        "name": name
+    })
+}
+function update_dropdown_from_sql(results) {
+    results.forEach((element) => {
+        update_dropdown(element.teamId, element.name);
+    })
+    return 1;
+}
+async function getteams(userId) {
+    const sql = `SELECT teamId,name from team WHERE managerId =${userId}`;
+    let teams = await db.query(sql);
+    return teams.results;
+}
+async function getinnerteams(teamId) {
+    const sql = `SELECT userId from user WHERE teamId = ${teamId} AND isManager = 1`;
+    let managerId = await db.query(sql);
+    for (let i = 0; i < managerId.results.length; i++) {
+        let teams = await getteams(managerId.results[i].userId);
+        if (teams) {
+            teams.forEach((element) => {
+                update_dropdown(element.teamId, element.name);
+            })
+        }
+    }
+    return 1;
+}
 //Login Route
+
 router.post("/login", async (req, res) => {
+    dropdown.splice(0, dropdown.length)
     let companyname = req.body.companyname;
     let username = req.body.username;
     let password = req.body.password;
@@ -82,65 +116,14 @@ router.post("/login", async (req, res) => {
                     }, CC.SECRET_KEY, {
                         expiresIn: '3h'
                     });
-                    let dropdown = [];
-                    dropdown.push({
-                        "id": id,
-                        "name": name
-                    })
-                    if (managerId === 0) {
-                        const dropDownQuery = `SELECT userId, name FROM user WHERE isManager = 1 AND userId NOT IN (${id}) `;
-                        let dropDownResults = await db.query(dropDownQuery)
-                        dropDownResults.results.forEach((element) => {
-                            dropdown.push({
-                                "id": element.userId,
-                                "name": element.name
-                            })
-                        });
-                        res.send({
-                            token,
-                            "userId": id,
-                            isManager,
-                            dropdown,
-                            email,
-                            firstname,
-                            profilePic,
-                            profileThumbnailUrl,
-                            previousPassword
-                        })
-                    } else {
-                        if (isManager === 1) {
-                            async function generate_dropdown(a) {
-                                let ids = '';
-                                a.forEach((el) => {
-                                    if (ids.length === 0) {
-                                        ids = ids + el.userId;
-                                    } else {
-                                        ids = ids + ',' + el.userId;
-                                    }
-                                });
-                                if (ids.length > 0) {
-                                    let sq = `SELECT userId, name FROM user WHERE managerId IN(${ids}) AND isManager = 1`;
-                                    let ds = await db.query(sq);
-                                    ds.results.forEach((element) => {
-                                        dropdown.push({
-                                            "id": element.userId,
-                                            "name": element.name
-                                        })
-                                    });
-                                    generate_dropdown(ds.results);
-                                }
-                            }
-                            const sql2 = `SELECT userId, name FROM user WHERE managerId = ${id} AND isManager = 1`;
-                            let dropquery = await db.query(sql2);
-                            dropquery.results.forEach(async (element) => {
-                                dropdown.push({
-                                    "id": element.userId,
-                                    "name": element.name
-                                })
+                    update_dropdown(0, `${name}'s Team`);
+                    if (isManager === 1) {
+                        if (managerId === 0) {
+                            const dropDownQuery = `SELECT teamId, name FROM team`;
+                            let dropDownResults = await db.query(dropDownQuery)
+                            dropDownResults.results.forEach((element) => {
+                                update_dropdown(element.teamId, element.name);
                             });
-                            if (dropquery) {
-                                generate_dropdown(dropquery.results)
-                            }
                             res.send({
                                 token,
                                 "userId": id,
@@ -153,19 +136,48 @@ router.post("/login", async (req, res) => {
                                 previousPassword
                             })
                         } else {
-                            res.send({
-                                token,
-                                "userId": id,
-                                isManager,
-                                email,
-                                firstname,
-                                profilePic,
-                                profileThumbnailUrl,
-                                previousPassword
-                            })
-                        }
-                    }
+                            const tn = `SELECT user.teamId,team.name from user,team  WHERE team.teamId = user.teamId AND user.userId =${id}`;
+                            let tnr = await db.query(tn);
+                            let ur = update_dropdown_from_sql(tnr.results);
+                            if (ur === 1) {
+                                const sql2 = `SELECT teamId, name FROM team WHERE managerId = ${id}`;
+                                let dropquery = await db.query(sql2);
+                                if (dropquery) {
+                                    let rs = []
+                                    update_dropdown_from_sql(dropquery.results);
+                                    for (let i = 0; i < dropquery.results.length; i++) {
+                                        let r = await getinnerteams(dropquery.results[i].teamId)
+                                        rs.push(r)
+                                    }
+                                    if (rs.length === dropquery.results.length) {
+                                        res.send({
+                                            token,
+                                            "userId": id,
+                                            isManager,
+                                            dropdown,
+                                            email,
+                                            firstname,
+                                            profilePic,
+                                            profileThumbnailUrl,
+                                            previousPassword
+                                        })
+                                    }
+                                }
 
+                            }
+                        }
+                    } else {
+                        res.send({
+                            token,
+                            "userId": id,
+                            isManager,
+                            email,
+                            firstname,
+                            profilePic,
+                            profileThumbnailUrl,
+                            previousPassword
+                        })
+                    }
                 } else {
                     res.send({
                         message: "Invalid Credentials"
@@ -273,7 +285,6 @@ async function manager_summary(teamId) {
     const sql = `SELECT userId from user WHERE teamId = ${teamId} AND isManager = 1`;
     let managerId = await db.query(sql);
     ma.push(managerId.results)
-
     if (ma[0].length > 1) {
         for (let i = 0; i < ma[0].length; i++) {
             let teams = await get_teams((ma[0][i].userId));
@@ -304,7 +315,6 @@ router.get("/manager/:userid", auth, async (req, res) => {
         let teamresultsquery = await db.query(sql);
         let mainteams = teamresultsquery.results;
         results.push(mainteams);
-
         for (let i = 0; i < mainteams.length; i++) {
             let managers = await get_managers(mainteams[i].teamId);
             results[0][i].managers = managers;
@@ -330,6 +340,20 @@ router.get("/manager/:userid", auth, async (req, res) => {
         })
     }
 
+})
+
+router.get("/teams/:teamid", auth, async (req, res) => {
+    let teamId = req.params.teamid;
+    const teamquery = `SELECT name from team WHERE teamId = ${teamId}`;
+    let teamqueryResults = await db.query(teamquery);
+    let teamName = teamqueryResults.results[0].name;
+    const sql3 = `SELECT userId,empId,emailId,teamId,startDate,name,firstname,profilePic,profileThumbnailUrl,isManager,isActive,onlineStatus from user WHERE teamId = ${teamId}`;
+    let teamusersquery = await db.query(sql3);
+    let teamusers = teamusersquery.results;
+    res.send({
+        teamName,
+        teamusers,
+    })
 })
 
 module.exports = router;
