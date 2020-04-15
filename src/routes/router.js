@@ -331,14 +331,12 @@ router.get("/manager/:userid", auth, async (req, res) => {
             for (let j = 0; j < managers.length; j++) {
                 r.push([managers[j]])
             }
-            // results[0][i].managers = managers;
             let managersummary = await manager_summary(mainteams[i].teamId);
             let rr = teams_splitter(managersummary);
             console.log(rr)
             for (let k = 0; k < rr.length; k++) {
                 r[k].push(rr[k])
             }
-            // results[0][i].summary = managersummary;
             results[0][i].managers = r;
             let users = await get_users(mainteams[i].teamId);
             results[0][i].users = users;
@@ -351,8 +349,13 @@ router.get("/manager/:userid", auth, async (req, res) => {
         const teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
         let teamqueryResults = await db.query(teamquery);
         results.push(teamqueryResults.results[0]);
+        let r = []
+        results[0].managers = [];
         let managers = await get_managers(teamqueryResults.results[0].teamId);
-        results[0].managers = [managers];
+        for (let j = 0; j < managers.length; j++) {
+            r.push([managers[j]])
+        }
+        results[0].managers = r;
         let users = await get_users(teamqueryResults.results[0].teamId);
         results[0].users = users;
         res.send({
@@ -368,8 +371,13 @@ router.get("/teams/:teamid", auth, async (req, res) => {
     const teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
     let teamqueryResults = await db.query(teamquery);
     results.push(teamqueryResults.results[0]);
-    let managers = await get_managers(teamqueryResults.results[0].teamId);
-    results[0].managers = [managers];
+    let r = []
+    results[0].managers = [];
+    let managers = await get_managers(teamId);
+    for (let j = 0; j < managers.length; j++) {
+        r.push([managers[j]])
+    }
+    results[0].managers = r;
     let users = await get_users(teamqueryResults.results[0].teamId);
     results[0].users = users;
     res.send({
