@@ -4,6 +4,7 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcryptjs');
 const CC = require('../constants');
+const nodemailer = require('nodemailer');
 
 //Middlewares
 const auth = require('../middlewares/auth');
@@ -69,6 +70,7 @@ async function getteams(userId) {
     let teams = await db.query(sql);
     return teams.results;
 }
+
 async function getinnerteams(teamId) {
     const sql = `SELECT userId from user WHERE teamId = ${teamId} AND isManager = 1`;
     let managerId = await db.query(sql);
@@ -81,6 +83,25 @@ async function getinnerteams(teamId) {
         }
     }
     return 1;
+}
+async function create_token(id, expiresIn) {
+    const token = jwt.sign({
+        userId: id
+    }, CC.SECRET_KEY, {
+        expiresIn
+    });
+    return token;
+}
+async function validate_token(token) {
+    let r;
+    jwt.verify(token, CC.SECRET_KEY, async (err) => {
+        if (err) {
+            r = "Invalid";
+        } else {
+            r = "Valid";
+        }
+    })
+    return r;
 }
 //Login Route
 
@@ -111,11 +132,7 @@ router.post("/login", async (req, res) => {
             let managerId = results[0].managerId;
             bcrypt.compare(password, haspass, async function (err, result) {
                 if (result) {
-                    const token = jwt.sign({
-                        userId: id
-                    }, CC.SECRET_KEY, {
-                        expiresIn: '3h'
-                    });
+                    const token = await create_token(id, '3h')
                     update_dropdown(0, `${name}'s Team`);
                     if (isManager === 1) {
                         if (managerId === 0) {
@@ -196,7 +213,57 @@ router.post("/login", async (req, res) => {
 //Forgot Password Route
 
 router.post("/forgotpass", async (req, res) => {
-    //TODO Develop Forgot password
+    let username = req.body.username;
+    const sql = `SELECT userId,empId,emailId FROM user WHERE empId = '${username}' or emailId= '${username}'`;
+    let userQuery = await db.query(sql);
+    if (userQuery.results.length > 0) {
+        let id = userQuery.results[0].userId;
+        let emailId = userQuery.results[0].emailId;
+        if (id) {
+            const token = await create_token(id, '3h');
+            try {
+                let transporter = nodemailer.createTransport({
+                    service: 'gmail',
+                    auth: {
+                        user: 'jayanth.m1995@gmail.com', // generated ethereal user
+                        pass: 'i@143magge' // generated ethereal password
+                    }
+                });
+                let info = await transporter.sendMail({
+                    from: 'jayanth.m1995@gmail.com',
+                    to: emailId,
+                    subject: "Password Reset",
+                    html: `<div>
+                <h1> Update Password</h1>
+                <span> To Update click the below link and follow the steps
+                </span><br/>
+                <span>
+                <b>Token will expire in 3 hrs</b>
+                </span><br/>
+                <a href='${CC.RESETPASSLINK}/${token}'>Click here to Reset</a>
+                </div>` // html body
+                });
+                if (info['accepted'].length > 0) {
+                    res.send({
+                        message: "Email Sent to registered Address"
+                    })
+                } else {
+                    res.send({
+                        message: "Error Sending Email"
+                    })
+                }
+            } catch (error) {
+                console.log(error)
+                res.send({
+                    message: "Error Sending Email"
+                })
+            }
+        }
+    } else {
+        res.send({
+            message: "No User Found"
+        })
+    }
 })
 
 //Update Pass route
@@ -247,6 +314,7 @@ async function get_managers(teamId) {
     manager_array = manager_array[0]
     return manager_array;
 }
+
 async function team_summary(teamid, userId) {
     teamSummary = [];
     const tn = `SELECT name from team WHERE teamId =${teamid}`;
@@ -311,6 +379,7 @@ function teams_splitter(resl) {
     }, Object.create(null));
     return Array.from(result);
 }
+
 router.get("/manager/:userid", auth, async (req, res) => {
     let userId = req.params.userid;
     let results = [];
@@ -385,4 +454,14 @@ router.get("/teams/:teamid", auth, async (req, res) => {
     })
 })
 
+router.post("/validate", async (req, res) => {
+    console.log(req.body.token)
+    let r = await validate_token(req.body.token);
+
+    if (r) {
+        res.send({
+            message: r
+        })
+    }
+})
 module.exports = router;
