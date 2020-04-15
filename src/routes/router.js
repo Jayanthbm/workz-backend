@@ -334,8 +334,9 @@ router.get("/manager/:userid", auth, async (req, res) => {
             // results[0][i].managers = managers;
             let managersummary = await manager_summary(mainteams[i].teamId);
             let rr = teams_splitter(managersummary);
+            console.log(rr)
             for (let k = 0; k < rr.length; k++) {
-                r[0].push(rr[k])
+                r[k].push(rr[k])
             }
             // results[0][i].summary = managersummary;
             results[0][i].managers = r;
@@ -351,7 +352,7 @@ router.get("/manager/:userid", auth, async (req, res) => {
         let teamqueryResults = await db.query(teamquery);
         results.push(teamqueryResults.results[0]);
         let managers = await get_managers(teamqueryResults.results[0].teamId);
-        results[0].managers = managers;
+        results[0].managers = [managers];
         let users = await get_users(teamqueryResults.results[0].teamId);
         results[0].users = users;
         res.send({
@@ -368,7 +369,7 @@ router.get("/teams/:teamid", auth, async (req, res) => {
     let teamqueryResults = await db.query(teamquery);
     results.push(teamqueryResults.results[0]);
     let managers = await get_managers(teamqueryResults.results[0].teamId);
-    results[0].managers = managers;
+    results[0].managers = [managers];
     let users = await get_users(teamqueryResults.results[0].teamId);
     results[0].users = users;
     res.send({
