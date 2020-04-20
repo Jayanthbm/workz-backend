@@ -253,7 +253,6 @@ router.post("/forgotpass", async (req, res) => {
                     })
                 }
             } catch (error) {
-                console.log(error)
                 res.send({
                     message: "Error Sending Email"
                 })
@@ -402,7 +401,6 @@ router.get("/manager/:userid", auth, async (req, res) => {
             }
             let managersummary = await manager_summary(mainteams[i].teamId);
             let rr = teams_splitter(managersummary);
-            console.log(rr)
             for (let k = 0; k < rr.length; k++) {
                 r[k].push(rr[k])
             }
@@ -446,8 +444,13 @@ router.get("/teams/:teamid", auth, async (req, res) => {
     for (let j = 0; j < managers.length; j++) {
         r.push([managers[j]])
     }
+    let managersummary = await manager_summary(teamId);
+    let rr = teams_splitter(managersummary);
+    for (let k = 0; k < rr.length; k++) {
+        r[k].push(rr[k])
+    }
     results[0].managers = r;
-    let users = await get_users(teamqueryResults.results[0].teamId);
+    let users = await get_users(teamId);
     results[0].users = users;
     res.send({
         results,
