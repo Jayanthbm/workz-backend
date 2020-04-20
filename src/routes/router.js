@@ -334,6 +334,7 @@ async function team_summary(teamid, userId) {
     teamSummary = {
         userId,
         team,
+        teamId: teamid,
         "total_employees": te,
         "active": ta,
         "inactive": ti,
