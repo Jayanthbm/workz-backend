@@ -9,6 +9,211 @@ const nodemailer = require('nodemailer');
 //Middlewares
 const auth = require('../middlewares/auth');
 
+//Functions
+
+//Get Name from UserId
+async function getManagerName(userId) {
+    try {
+        let m = []
+        let MN = `SELECT userId,name
+            FROM user 
+            WHERE userId  =${userId}`;
+        let MNR = await db.query(MN);
+        let n = await getTeams(userId);
+        if (n.length > 1) {
+            m.push({
+                userId: userId,
+                name: MNR.results[0].name + 's Teams'
+            })
+        } else {
+            m.push({
+                userId: userId,
+                name: MNR.results[0].name + 's Team'
+            })
+        }
+
+        return m[0];
+    } catch (e) {
+        console.log(e)
+    }
+}
+
+//Get Userid from Team Id
+async function getUserIdfromTeam(teamId) {
+    try {
+        let Uid = `SELECT userId
+                FROM user
+                WHERE teamId =${teamId} AND isManager = 1`;
+        let UidR = await db.query(Uid);
+        return UidR.results;
+    } catch (e) {
+        console.log(e)
+    }
+}
+
+//Get teams of the User
+
+async function getTeams(userId) {
+    try {
+        let TQ = `SELECT team.teamId,team.name
+            FROM team 
+            WHERE managerId = ${userId}`;
+        let TQR = await db.query(TQ);
+        return TQR.results
+    } catch (e) {
+        console.log(e)
+    }
+}
+
+//Get Array Size
+function getarraysize(array) {
+    return array.length
+}
+
+//Function to Generate Dropdown
+
+async function generate_dropdown(userId) {
+    try {
+        let dp = [];
+        //Get the main team of user
+        let MQ = `SELECT user.teamId,team.name
+            FROM user,team 
+            WHERE user.userId = ${userId} AND user.teamId = team.teamId`;
+        let MQR = await db.query(MQ);
+        dp.push(MQR.results[0])
+        await a(userId);
+        //get the teams of user
+        async function a(userId) {
+            let T = await getTeams(userId);
+            let mn = await getManagerName(userId)
+            dp[getarraysize(dp)] = mn
+            dp[getarraysize(dp) - 1]['teams'] = T;
+            // if (T.length > 1) {
+            //     let mn = await getManagerName(userId)
+            //     dp[getarraysize(dp)] = mn
+            //     dp[getarraysize(dp) - 1]['teams'] = T;
+            // } else {
+            //     dp[getarraysize(dp)] = T;
+            // }
+            for (let i = 0; i < T.length; i++) {
+                let uid = await getUserIdfromTeam(T[i].teamId);
+                if (uid) {
+                    for (let j = 0; j < uid.length; j++) {
+                        await a(uid[j].userId)
+                    }
+                } else {
+                    return
+                }
+            }
+        }
+        console.log(dp)
+        return dp;
+    } catch (e) {
+        console.log(e)
+    }
+}
+
+//Function to Create Token
+
+async function create_token(id, expiresIn) {
+    const token = jwt.sign({
+        userId: id
+    }, CC.SECRET_KEY, {
+        expiresIn
+    });
+    return token;
+}
+
+//Function to Validate Token
+async function validate_token(token) {
+    let r;
+    jwt.verify(token, CC.SECRET_KEY, async (err) => {
+        if (err) {
+            r = "Invalid";
+        } else {
+            r = "Valid";
+        }
+    })
+    return r;
+}
+
+//manager based query
+async function get_managers(teamId) {
+    let manager_array = []
+    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus from user WHERE teamId = ${teamId} AND isManager = 1`;
+    let managers = await db.query(sql);
+    manager_array.push(managers.results)
+    manager_array = manager_array[0]
+    return manager_array;
+}
+
+async function team_summary(teamid, userId) {
+    teamSummary = [];
+    const tn = `SELECT name from team WHERE teamId =${teamid}`;
+    let teamname = await db.query(tn);
+    team = teamname.results[0].name;
+    const sql = `SELECT count(userId) as total_employees FROM user WHERE teamId = ${teamid}`;
+    let total_employees = await db.query(sql);
+    te = total_employees.results[0].total_employees;
+    const sql1 = `SELECT  count(userId) as active FROM user WHERE teamId = ${teamid} and onlineStatus ='active'`;
+    let active = await db.query(sql1);
+    ta = active.results[0].active;
+    const sql2 = `SELECT count(userId) as inactive FROM user WHERE teamId = ${teamid} and onlineStatus ='passive'`;
+    let inactive = await db.query(sql2);
+    ti = inactive.results[0].inactive;
+    const sql3 = `SELECT count(userId) as offline FROM user WHERE teamId = ${teamid} and onlineStatus ='offline'`;
+    let offline = await db.query(sql3);
+    to = offline.results[0].offline;
+    teamSummary = {
+        userId,
+        team,
+        teamId: teamid,
+        "total_employees": te,
+        "active": ta,
+        "inactive": ti,
+        "offline": to
+    }
+    return teamSummary
+}
+async function get_teams(userId) {
+    const sql = `SELECT teamId from team WHERE managerId =${userId}`;
+    let teams = await db.query(sql);
+    return teams.results;
+}
+async function manager_summary(teamId) {
+    let ma = []
+    let ms = []
+    const sql = `SELECT userId from user WHERE teamId = ${teamId} AND isManager = 1`;
+    let managerId = await db.query(sql);
+    ma.push(managerId.results)
+    if (ma[0].length > 1) {
+        for (let i = 0; i < ma[0].length; i++) {
+            let teams = await get_teams((ma[0][i].userId));
+            for (let j = 0; j < teams.length; j++) {
+                let ts = await team_summary(teams[j].teamId, ma[0][i].userId)
+                ms.push(ts)
+            }
+        }
+    }
+    return ms;
+}
+async function get_users(teamId) {
+    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus from user WHERE teamId = ${teamId} AND isManager = 0`;
+    let users = await db.query(sql);
+    return users.results;
+}
+function teams_splitter(resl) {
+    let result = new Set();
+    resl.reduce(function (r, a) {
+        r[a.userId] = r[a.userId] || [];
+        r[a.userId].push(a);
+        result.add(r[a.userId])
+        return r;
+    }, Object.create(null));
+    return Array.from(result);
+}
+
+//Routes
 //TODO remove route during production
 router.get("/", async (req, res) => {
     res.send({
@@ -51,62 +256,9 @@ router.post("/submitform", async (req, res) => {
 
 })
 
-
-let dropdown = [];
-function update_dropdown(id, name) {
-    dropdown.push({
-        "id": id,
-        "name": name
-    })
-}
-function update_dropdown_from_sql(results) {
-    results.forEach((element) => {
-        update_dropdown(element.teamId, element.name);
-    })
-    return 1;
-}
-async function getteams(userId) {
-    const sql = `SELECT teamId,name from team WHERE managerId =${userId}`;
-    let teams = await db.query(sql);
-    return teams.results;
-}
-
-async function getinnerteams(teamId) {
-    const sql = `SELECT userId from user WHERE teamId = ${teamId} AND isManager = 1`;
-    let managerId = await db.query(sql);
-    for (let i = 0; i < managerId.results.length; i++) {
-        let teams = await getteams(managerId.results[i].userId);
-        if (teams) {
-            teams.forEach((element) => {
-                update_dropdown(element.teamId, element.name);
-            })
-        }
-    }
-    return 1;
-}
-async function create_token(id, expiresIn) {
-    const token = jwt.sign({
-        userId: id
-    }, CC.SECRET_KEY, {
-        expiresIn
-    });
-    return token;
-}
-async function validate_token(token) {
-    let r;
-    jwt.verify(token, CC.SECRET_KEY, async (err) => {
-        if (err) {
-            r = "Invalid";
-        } else {
-            r = "Valid";
-        }
-    })
-    return r;
-}
 //Login Route
 
 router.post("/login", async (req, res) => {
-    dropdown.splice(0, dropdown.length)
     let companyname = req.body.companyname;
     let username = req.body.username;
     let password = req.body.password;
@@ -133,55 +285,20 @@ router.post("/login", async (req, res) => {
             bcrypt.compare(password, haspass, async function (err, result) {
                 if (result) {
                     const token = await create_token(id, '3h')
-                    update_dropdown(0, `${name}'s Team`);
                     if (isManager === 1) {
-                        if (managerId === 0) {
-                            const dropDownQuery = `SELECT teamId, name FROM team`;
-                            let dropDownResults = await db.query(dropDownQuery)
-                            dropDownResults.results.forEach((element) => {
-                                update_dropdown(element.teamId, element.name);
-                            });
+                        let dp = await generate_dropdown(id);
+                        if (dp) {
                             res.send({
                                 token,
                                 "userId": id,
                                 isManager,
-                                dropdown,
+                                dropdown: dp,
                                 email,
                                 firstname,
                                 profilePic,
                                 profileThumbnailUrl,
                                 previousPassword
                             })
-                        } else {
-                            const tn = `SELECT user.teamId,team.name from user,team  WHERE team.teamId = user.teamId AND user.userId =${id}`;
-                            let tnr = await db.query(tn);
-                            let ur = update_dropdown_from_sql(tnr.results);
-                            if (ur === 1) {
-                                const sql2 = `SELECT teamId, name FROM team WHERE managerId = ${id}`;
-                                let dropquery = await db.query(sql2);
-                                if (dropquery) {
-                                    let rs = []
-                                    update_dropdown_from_sql(dropquery.results);
-                                    for (let i = 0; i < dropquery.results.length; i++) {
-                                        let r = await getinnerteams(dropquery.results[i].teamId)
-                                        rs.push(r)
-                                    }
-                                    if (rs.length === dropquery.results.length) {
-                                        res.send({
-                                            token,
-                                            "userId": id,
-                                            isManager,
-                                            dropdown,
-                                            email,
-                                            firstname,
-                                            profilePic,
-                                            profileThumbnailUrl,
-                                            previousPassword
-                                        })
-                                    }
-                                }
-
-                            }
                         }
                     } else {
                         res.send({
@@ -303,82 +420,6 @@ router.post("/updatepass", auth, async (req, res) => {
         }
     })
 })
-
-//manager based query
-async function get_managers(teamId) {
-    let manager_array = []
-    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus from user WHERE teamId = ${teamId} AND isManager = 1`;
-    let managers = await db.query(sql);
-    manager_array.push(managers.results)
-    manager_array = manager_array[0]
-    return manager_array;
-}
-
-async function team_summary(teamid, userId) {
-    teamSummary = [];
-    const tn = `SELECT name from team WHERE teamId =${teamid}`;
-    let teamname = await db.query(tn);
-    team = teamname.results[0].name;
-    const sql = `SELECT count(userId) as total_employees FROM user WHERE teamId = ${teamid}`;
-    let total_employees = await db.query(sql);
-    te = total_employees.results[0].total_employees;
-    const sql1 = `SELECT  count(userId) as active FROM user WHERE teamId = ${teamid} and onlineStatus ='active'`;
-    let active = await db.query(sql1);
-    ta = active.results[0].active;
-    const sql2 = `SELECT count(userId) as inactive FROM user WHERE teamId = ${teamid} and onlineStatus ='passive'`;
-    let inactive = await db.query(sql2);
-    ti = inactive.results[0].inactive;
-    const sql3 = `SELECT count(userId) as offline FROM user WHERE teamId = ${teamid} and onlineStatus ='offline'`;
-    let offline = await db.query(sql3);
-    to = offline.results[0].offline;
-    teamSummary = {
-        userId,
-        team,
-        teamId: teamid,
-        "total_employees": te,
-        "active": ta,
-        "inactive": ti,
-        "offline": to
-    }
-    return teamSummary
-}
-async function get_teams(userId) {
-    const sql = `SELECT teamId from team WHERE managerId =${userId}`;
-    let teams = await db.query(sql);
-    return teams.results;
-}
-async function manager_summary(teamId) {
-    let ma = []
-    let ms = []
-    const sql = `SELECT userId from user WHERE teamId = ${teamId} AND isManager = 1`;
-    let managerId = await db.query(sql);
-    ma.push(managerId.results)
-    if (ma[0].length > 1) {
-        for (let i = 0; i < ma[0].length; i++) {
-            let teams = await get_teams((ma[0][i].userId));
-            for (let j = 0; j < teams.length; j++) {
-                let ts = await team_summary(teams[j].teamId, ma[0][i].userId)
-                ms.push(ts)
-            }
-        }
-    }
-    return ms;
-}
-async function get_users(teamId) {
-    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus from user WHERE teamId = ${teamId} AND isManager = 0`;
-    let users = await db.query(sql);
-    return users.results;
-}
-function teams_splitter(resl) {
-    let result = new Set();
-    resl.reduce(function (r, a) {
-        r[a.userId] = r[a.userId] || [];
-        r[a.userId].push(a);
-        result.add(r[a.userId])
-        return r;
-    }, Object.create(null));
-    return Array.from(result);
-}
 
 router.get("/manager/:userid", auth, async (req, res) => {
     let userId = req.params.userid;
