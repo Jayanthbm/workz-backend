@@ -23,12 +23,12 @@ async function getManagerName(userId) {
         if (n.length > 1) {
             m.push({
                 userId: userId,
-                name: MNR.results[0].name + 's Teams'
+                name: MNR.results[0].name + '\'s Teams'
             })
         } else {
             m.push({
                 userId: userId,
-                name: MNR.results[0].name + 's Team'
+                name: MNR.results[0].name + '\'s Team'
             })
         }
 
@@ -140,11 +140,17 @@ async function validate_token(token) {
 //manager based query
 async function get_managers(teamId) {
     let manager_array = []
-    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus from user WHERE teamId = ${teamId} AND isManager = 1`;
+    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus,onlineStatusTimestamp,city,message,skype,mobile from user WHERE teamId = ${teamId} AND isManager = 1`;
     let managers = await db.query(sql);
     manager_array.push(managers.results)
     manager_array = manager_array[0]
     return manager_array;
+}
+
+async function get_users(teamId) {
+    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus,onlineStatusTimestamp,city,message,skype,mobile  from user WHERE teamId = ${teamId} AND isManager = 0`;
+    let users = await db.query(sql);
+    return users.results;
 }
 
 async function team_summary(teamid, userId) {
@@ -197,11 +203,7 @@ async function manager_summary(teamId) {
     }
     return ms;
 }
-async function get_users(teamId) {
-    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus from user WHERE teamId = ${teamId} AND isManager = 0`;
-    let users = await db.query(sql);
-    return users.results;
-}
+
 function teams_splitter(resl) {
     let result = new Set();
     resl.reduce(function (r, a) {
