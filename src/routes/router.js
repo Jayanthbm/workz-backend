@@ -34,7 +34,6 @@ async function getManagerName(userId) {
 
         return m[0];
     } catch (e) {
-        console.log(e)
     }
 }
 
@@ -47,7 +46,7 @@ async function getUserIdfromTeam(teamId) {
         let UidR = await db.query(Uid);
         return UidR.results;
     } catch (e) {
-        console.log(e)
+
     }
 }
 
@@ -61,7 +60,6 @@ async function getTeams(userId) {
         let TQR = await db.query(TQ);
         return TQR.results
     } catch (e) {
-        console.log(e)
     }
 }
 
@@ -106,10 +104,8 @@ async function generate_dropdown(userId) {
                 }
             }
         }
-        console.log(dp)
         return dp;
     } catch (e) {
-        console.log(e)
     }
 }
 
@@ -502,7 +498,6 @@ router.get("/teams/:teamid", auth, async (req, res) => {
 })
 
 router.post("/validate", async (req, res) => {
-    console.log(req.body.token)
     let r = await validate_token(req.body.token);
 
     if (r) {
