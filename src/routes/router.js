@@ -133,6 +133,7 @@ async function validate_token(token) {
     return r;
 }
 
+//TODO Update Onlinestatus based on Timestamp
 //manager based query
 async function get_managers(teamId) {
     let manager_array = []
@@ -503,6 +504,105 @@ router.post("/validate", async (req, res) => {
     if (r) {
         res.send({
             message: r
+        })
+    }
+})
+function toISOLocal(d) {
+    var z = n => ('0' + n).slice(-2);
+    var zz = n => ('00' + n).slice(-3);
+    var off = d.getTimezoneOffset();
+    var sign = off < 0 ? '+' : '-';
+    off = Math.abs(off);
+
+    return d.getFullYear() + '-'
+        + z(d.getMonth() + 1) + '-' +
+        z(d.getDate()) + 'T' +
+        z(d.getHours()) + ':' +
+        z(d.getMinutes()) + ':' +
+        z(d.getSeconds()) + '.' +
+        zz(d.getMilliseconds()) +
+        sign + z(off / 60 | 0) + ':' + z(off % 60);
+}
+function startOfWeek(date) {
+    date = new Date(date);
+    var diff = date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+}
+function endOfWeek(date) {
+    var lastday = date.getDate() - (date.getDay() - 1) + 6;
+    return new Date(date.setDate(lastday));
+}
+function groupBy(arr, key) {
+    return (arr || []).reduce((acc, x = {}) => ({
+        ...acc,
+        [x[key]]: [...acc[x[key]] || [], x]
+    }), {})
+}
+async function getTeamMembers(teamId) {
+    const sql = `SELECT userId ,name 
+                FROM user
+                WHERE teamId =${teamId}
+                ORDER BY name ASC`;
+    let sqlR = await db.query(sql);
+    return sqlR.results;
+}
+router.get('/deepdivedropdown', auth, async (req, res) => {
+    let results;
+    let managerId = req.body.managerId;
+    let teamId = req.body.teamId;
+    if (managerId || teamId) {
+        if (managerId && teamId) {
+            res.send({
+                message: "Both ManagerId and Teamid Passed"
+            })
+        } else {
+            if (managerId) {
+                const getTeamId = `SELECT teamId
+                                    FROM user   
+                                    WHERE userId = ${managerId}`;
+                let getTeamIdR = await db.query(getTeamId);
+                results = await getTeamMembers(getTeamIdR.results[0].teamId)
+            }
+            if (teamId) {
+                results = await getTeamMembers(teamId);
+            }
+            if (results) {
+                res.send(results)
+            }
+        }
+    } else {
+        res.send({
+            message: "Missing Fields"
+        })
+    }
+})
+router.get("/deepdive", auth, async (req, res) => {
+    try {
+        let userId = req.body.userId;
+        if (userId) {
+            let date = new Date(req.body.date) || new Date();
+            let startDate = toISOLocal(startOfWeek(date)).split('T')[0];
+            let endDate = toISOLocal(endOfWeek(date)).split('T')[0];
+            const dq = `SELECT timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,flagged,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) BETWEEN '${startDate}' AND '${endDate}'`;
+            let dqr = await db.query(dq);
+            if (dqr.results.length > 0) {
+                let deepdive = dqr.results;
+                let a = groupBy(deepdive, 'timecard');
+                res.send(a)
+            } else {
+                res.send({
+                    message: "No Results Found"
+                })
+            }
+        } else {
+            res.send({
+                message: "Missing UserId"
+            })
+        }
+    } catch (e) {
+        res.send({
+            message: "Error",
+            e
         })
     }
 })
