@@ -5,10 +5,29 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require('bcryptjs');
 const CC = require('../constants');
 const nodemailer = require('nodemailer');
-
+const AWS = require('aws-sdk');
 //Middlewares
 const auth = require('../middlewares/auth');
 
+//AWS
+const cloudFront = new AWS.CloudFront.Signer(
+    CC.cfprivateKey,
+    CC.cfpublickey
+);
+
+const policy = JSON.stringify({
+    Statement: [
+        {
+            Resource: `http*://cdn.${CC.sitedomain}/*`,
+            Condition: {
+                DateLessThan: {
+                    'AWS:EpochTime':
+                        Math.floor(new Date().getTime() / 1000) + 60 * 60 * 1, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
+                },
+            },
+        },
+    ],
+});
 //Functions
 
 //Get Name from UserId
@@ -576,9 +595,9 @@ router.get('/deepdivedropdown', auth, async (req, res) => {
         })
     }
 })
-router.get("/deepdive", auth, async (req, res) => {
+router.get("/deepdive/:userId", async (req, res) => {
     try {
-        let userId = req.body.userId;
+        let userId = req.params.userId;
         if (userId) {
             let date = new Date(req.body.date) || new Date();
             let startDate = toISOLocal(startOfWeek(date)).split('T')[0];
@@ -588,6 +607,26 @@ router.get("/deepdive", auth, async (req, res) => {
             if (dqr.results.length > 0) {
                 let deepdive = dqr.results;
                 let a = groupBy(deepdive, 'timecard');
+                const cookie = cloudFront.getSignedCookie({
+                    policy,
+                });
+                res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
+                    domain: CC.sitedomain,
+                    path: '/',
+                    httpOnly: true,
+                });
+
+                res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
+                    domain: CC.sitedomain,
+                    path: '/',
+                    httpOnly: true,
+                });
+
+                res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
+                    domain: CC.sitedomain,
+                    path: '/',
+                    httpOnly: true,
+                });
                 res.send(a)
             } else {
                 res.send({
