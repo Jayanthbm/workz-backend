@@ -11,14 +11,14 @@ const auth = require('../middlewares/auth');
 
 //AWS
 const cloudFront = new AWS.CloudFront.Signer(
-    CC.cfprivateKey,
-    CC.cfpublickey
+    CC.cfpublickey,
+    CC.cfprivateKey
 );
 
 const policy = JSON.stringify({
     Statement: [
         {
-            Resource: `http*://cdn.${CC.sitedomain}/*`,
+            Resource: 'http*://cdn.workforcez.net/*',
             Condition: {
                 DateLessThan: {
                     'AWS:EpochTime':
@@ -595,11 +595,16 @@ router.get('/deepdivedropdown', auth, async (req, res) => {
         })
     }
 })
-router.get("/deepdive/:userId", async (req, res) => {
+router.get("/deepdive/", auth, async (req, res) => {
     try {
-        let userId = req.params.userId;
+        let userId = req.body.userId;
         if (userId) {
-            let date = new Date(req.body.date) || new Date();
+            let date;
+            if (req.body.date) {
+                date = new Date(req.body.date);
+            } else {
+                date = new Date();
+            }
             let startDate = toISOLocal(startOfWeek(date)).split('T')[0];
             let endDate = toISOLocal(endOfWeek(date)).split('T')[0];
             const dq = `SELECT timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,flagged,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) BETWEEN '${startDate}' AND '${endDate}'`;
@@ -607,26 +612,6 @@ router.get("/deepdive/:userId", async (req, res) => {
             if (dqr.results.length > 0) {
                 let deepdive = dqr.results;
                 let a = groupBy(deepdive, 'timecard');
-                const cookie = cloudFront.getSignedCookie({
-                    policy,
-                });
-                res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
-                    domain: CC.sitedomain,
-                    path: '/',
-                    httpOnly: true,
-                });
-
-                res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
-                    domain: CC.sitedomain,
-                    path: '/',
-                    httpOnly: true,
-                });
-
-                res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
-                    domain: CC.sitedomain,
-                    path: '/',
-                    httpOnly: true,
-                });
                 res.send(a)
             } else {
                 res.send({
@@ -643,6 +628,37 @@ router.get("/deepdive/:userId", async (req, res) => {
             message: "Error",
             e
         })
+    }
+})
+
+router.post("/setcookie", auth, async (req, res) => {
+    try {
+        const cookie = cloudFront.getSignedCookie({
+            policy,
+        });
+
+        res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
+            domain: '.your-domain.com',
+            path: '/',
+            httpOnly: true,
+        });
+
+        res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
+            domain: '.your-domain.com',
+            path: '/',
+            httpOnly: true,
+        });
+
+        res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
+            domain: '.your-domain.com',
+            path: '/',
+            httpOnly: true,
+        });
+
+        // Send some response
+        res.send({ message: 'Cookie Set Succesfully' });
+    } catch (e) {
+        res.send(e)
     }
 })
 module.exports = router;

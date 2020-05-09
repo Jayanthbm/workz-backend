@@ -26,7 +26,7 @@ IR70QiyrYDBgj1ZSxFMayBjaHBOHtp5xy09tyVVJdBf6StbnLa1l5L9yCs8MZg2W
 Xh8XDR0CgYAYM7Yus6XR1r3mIjaWgj0/hOFhX08LG56QqsVbjFEpb3/jkSJevkVP
 fDKlGEtS1dBxwAYZ0pAM6XmnlpQdEt394lb+d1QaBZxzrMj3i4aNiWjlSWqJutxv
 TNu8kIIfvX1D8tvmQoABHGp5ZIeEfhK7V8G4Oii6OYfdX8XrG/b7Vg==
------END RSA PRIVATE KEY-----`
+-----END RSA PRIVATE KEY-----`;
 const cfpublickey = 'APKAIMZUNS62HHFBQPHQ'; // cloud front public key
 const cfurl = 'https://cdn.workforcez.net/'; // cloud front URL
 const sitedomain = 'workforcez.net';
