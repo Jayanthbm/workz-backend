@@ -9,8 +9,10 @@ const AWS = require('aws-sdk');
 //Middlewares
 const auth = require('../middlewares/auth');
 
-//Functions
+//AWS
+const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
 
+//Functions
 //Get Name from UserId
 async function getManagerName(userId) {
     try {
@@ -354,7 +356,7 @@ router.post("/login", async (req, res) => {
     let companyname = req.body.companyname;
     let username = req.body.username;
     let password = req.body.password;
-    const sql = `SELECT user.userId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') `;
+    const sql = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') `;
     try {
         let {
             results
@@ -366,6 +368,7 @@ router.post("/login", async (req, res) => {
         } else {
             let haspass = results[0].password;
             let id = results[0].userId;
+            let companyId = results[0].companyId;
             let email = results[0].emailId;
             let name = results[0].name;
             let firstname = results[0].firstname;
@@ -374,6 +377,22 @@ router.post("/login", async (req, res) => {
             let isManager = results[0].isManager;
             let previousPassword = results[0].previousPassword;
             let managerId = results[0].managerId;
+            const policy = JSON.stringify({
+                Statement: [
+                    {
+                        Resource: CC.cfurl + companyId + '/*',
+                        Condition: {
+                            DateLessThan: {
+                                'AWS:EpochTime':
+                                    Math.floor(new Date().getTime() / 1000) + 60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
+                            },
+                        },
+                    },
+                ],
+            });
+            const cookie = cloudFront.getSignedCookie({
+                policy,
+            });
             bcrypt.compare(password, haspass, async function (err, result) {
                 if (result) {
                     const token = await create_token(id, '3h')
@@ -382,6 +401,13 @@ router.post("/login", async (req, res) => {
                         if (dp) {
                             res.send({
                                 token,
+                                cookieexpiry: CC.cookieexpiry,
+                                domain: '.' + CC.cfdomain,
+                                path: '/',
+                                httpOnly: true,
+                                "CloudFront-Key-Pair-Id": cookie['CloudFront-Key-Pair-Id'],
+                                "CloudFront-Policy": cookie['CloudFront-Policy'],
+                                "CloudFront-Signature": cookie['CloudFront-Signature'],
                                 "userId": id,
                                 isManager,
                                 dropdown: dp,
@@ -395,6 +421,13 @@ router.post("/login", async (req, res) => {
                     } else {
                         res.send({
                             token,
+                            cookieexpiry: CC.cookieexpiry,
+                            domain: '.' + CC.cfdomain,
+                            path: '/',
+                            httpOnly: true,
+                            "CloudFront-Key-Pair-Id": cookie['CloudFront-Key-Pair-Id'],
+                            "CloudFront-Policy": cookie['CloudFront-Policy'],
+                            "CloudFront-Signature": cookie['CloudFront-Signature'],
                             "userId": id,
                             isManager,
                             email,
@@ -650,8 +683,6 @@ router.post("/deepdive/", auth, async (req, res) => {
             if (dqr.results.length > 0) {
                 let deepdive = dqr.results;
                 for (let i = 0; i < deepdive.length; i++) {
-                    let screenshotUrl = await urlSigner(deepdive[i].screenshotUrl);
-                    let webcamUrl = await urlSigner(deepdive[i].webcamUrl);
                     let r = {
                         timecardId: deepdive[i].timecardId,
                         timecard: deepdive[i].timecard,
@@ -661,8 +692,8 @@ router.post("/deepdive/", auth, async (req, res) => {
                         appName: deepdive[i].appName,
                         windowName: deepdive[i].windowName,
                         windowUrl: deepdive[i].windowUrl,
-                        screenshotUrl,
-                        webcamUrl,
+                        screenshotUrl: deepdive[i].screenshotUrl,
+                        webcamUrl: deepdive[i].webcamUrl,
                         flagged: deepdive[i].flagged,
                         status: deepdive[i].status,
                         focus: deepdive[i].focus,
@@ -693,5 +724,6 @@ router.post("/deepdive/", auth, async (req, res) => {
         })
     }
 })
+
 
 module.exports = router;
