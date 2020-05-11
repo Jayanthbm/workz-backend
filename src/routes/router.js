@@ -601,7 +601,7 @@ router.post("/validate", async (req, res) => {
     }
 })
 
-router.get('/deepdivedropdown', auth, async (req, res) => {
+router.post('/deepdivedropdown', auth, async (req, res) => {
     let results;
     let managerId = req.body.managerId;
     let teamId = req.body.teamId;
