@@ -9,25 +9,6 @@ const AWS = require('aws-sdk');
 //Middlewares
 const auth = require('../middlewares/auth');
 
-//AWS
-const cloudFront = new AWS.CloudFront.Signer(
-    CC.cfpublickey,
-    CC.cfprivateKey
-);
-
-const policy = JSON.stringify({
-    Statement: [
-        {
-            Resource: 'http*://cdn.workforcez.net/*',
-            Condition: {
-                DateLessThan: {
-                    'AWS:EpochTime':
-                        Math.floor(new Date().getTime() / 1000) + 60 * 60 * 1, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
-                },
-            },
-        },
-    ],
-});
 //Functions
 
 //Get Name from UserId
@@ -152,21 +133,66 @@ async function validate_token(token) {
     return r;
 }
 
+//TODO online status based on timestamp
+async function onlineStatus(timestamp) {
+
+}
 //TODO Update Onlinestatus based on Timestamp
 //manager based query
 async function get_managers(teamId) {
-    let manager_array = []
-    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus,onlineStatusTimestamp,city,message,skype,mobile from user WHERE teamId = ${teamId} AND isManager = 1`;
-    let managers = await db.query(sql);
-    manager_array.push(managers.results)
-    manager_array = manager_array[0]
-    return manager_array;
+    let results = [];
+    const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus,onlineStatusTimestamp,city,message,skype,mobile  from user WHERE teamId = ${teamId} AND isManager = 1`;
+    let users = await db.query(sql);
+    for (let i = 0; i < users.results.length; i++) {
+        let r = {
+            userId: users.results[i].userId,
+            empId: users.results[i].empId,
+            emailId: users.results[i].emailId,
+            teamId: users.results[i].teamId,
+            startDate: users.results[i].startDate,
+            name: users.results[i].name,
+            firstname: users.results[i].firstname,
+            profilePic: users.results[i].profilePic,
+            profileThumbnailUrl: users.results[i].profileThumbnailUrl,
+            isActive: users.results[i].isActive,
+            onlineStatus: users.results[i].onlineStatus,
+            onlineStatusTimestamp: users.results[i].onlineStatusTimestamp,
+            city: users.results[i].city,
+            message: users.results[i].message,
+            skype: users.results[i].skype,
+            mobile: users.results[i].mobile
+        }
+        results.push(r)
+    }
+    return results;
 }
 
 async function get_users(teamId) {
+    let results = [];
     const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus,onlineStatusTimestamp,city,message,skype,mobile  from user WHERE teamId = ${teamId} AND isManager = 0`;
     let users = await db.query(sql);
-    return users.results;
+    for (let i = 0; i < users.results.length; i++) {
+        let r = {
+            userId: users.results[i].userId,
+            empId: users.results[i].empId,
+            emailId: users.results[i].emailId,
+            teamId: users.results[i].teamId,
+            startDate: users.results[i].startDate,
+            name: users.results[i].name,
+            firstname: users.results[i].firstname,
+            profilePic: users.results[i].profilePic,
+            profileThumbnailUrl: users.results[i].profileThumbnailUrl,
+            isActive: users.results[i].isActive,
+            onlineStatus: users.results[i].onlineStatus,
+            onlineStatusTimestamp: users.results[i].onlineStatusTimestamp,
+            city: users.results[i].city,
+            message: users.results[i].message,
+            skype: users.results[i].skype,
+            mobile: users.results[i].mobile
+        }
+        results.push(r)
+    }
+    return results;
 }
 
 async function team_summary(teamid, userId) {
@@ -231,6 +257,54 @@ function teams_splitter(resl) {
     return Array.from(result);
 }
 
+async function urlSigner(url1) {
+    const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
+    let uu = cloudFront.getSignedUrl({
+        url: url1,
+        expires: Math.floor((new Date()).getTime() / 1000) + (60 * 60 * 1)
+    })
+    return uu;
+}
+
+function toISOLocal(d) {
+    var z = n => ('0' + n).slice(-2);
+    var zz = n => ('00' + n).slice(-3);
+    var off = d.getTimezoneOffset();
+    var sign = off < 0 ? '+' : '-';
+    off = Math.abs(off);
+
+    return d.getFullYear() + '-'
+        + z(d.getMonth() + 1) + '-' +
+        z(d.getDate()) + 'T' +
+        z(d.getHours()) + ':' +
+        z(d.getMinutes()) + ':' +
+        z(d.getSeconds()) + '.' +
+        zz(d.getMilliseconds()) +
+        sign + z(off / 60 | 0) + ':' + z(off % 60);
+}
+function startOfWeek(date) {
+    date = new Date(date);
+    var diff = date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+}
+function endOfWeek(date) {
+    var lastday = date.getDate() - (date.getDay() - 1) + 6;
+    return new Date(date.setDate(lastday));
+}
+function groupBy(arr, key) {
+    return (arr || []).reduce((acc, x = {}) => ({
+        ...acc,
+        [x[key]]: [...acc[x[key]] || [], x]
+    }), {})
+}
+async function getTeamMembers(teamId) {
+    const sql = `SELECT userId ,name 
+                FROM user
+                WHERE teamId =${teamId}
+                ORDER BY name ASC`;
+    let sqlR = await db.query(sql);
+    return sqlR.results;
+}
 //Routes
 //TODO remove route during production
 router.get("/", async (req, res) => {
@@ -526,45 +600,7 @@ router.post("/validate", async (req, res) => {
         })
     }
 })
-function toISOLocal(d) {
-    var z = n => ('0' + n).slice(-2);
-    var zz = n => ('00' + n).slice(-3);
-    var off = d.getTimezoneOffset();
-    var sign = off < 0 ? '+' : '-';
-    off = Math.abs(off);
 
-    return d.getFullYear() + '-'
-        + z(d.getMonth() + 1) + '-' +
-        z(d.getDate()) + 'T' +
-        z(d.getHours()) + ':' +
-        z(d.getMinutes()) + ':' +
-        z(d.getSeconds()) + '.' +
-        zz(d.getMilliseconds()) +
-        sign + z(off / 60 | 0) + ':' + z(off % 60);
-}
-function startOfWeek(date) {
-    date = new Date(date);
-    var diff = date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1);
-    return new Date(date.setDate(diff));
-}
-function endOfWeek(date) {
-    var lastday = date.getDate() - (date.getDay() - 1) + 6;
-    return new Date(date.setDate(lastday));
-}
-function groupBy(arr, key) {
-    return (arr || []).reduce((acc, x = {}) => ({
-        ...acc,
-        [x[key]]: [...acc[x[key]] || [], x]
-    }), {})
-}
-async function getTeamMembers(teamId) {
-    const sql = `SELECT userId ,name 
-                FROM user
-                WHERE teamId =${teamId}
-                ORDER BY name ASC`;
-    let sqlR = await db.query(sql);
-    return sqlR.results;
-}
 router.get('/deepdivedropdown', auth, async (req, res) => {
     let results;
     let managerId = req.body.managerId;
@@ -595,7 +631,9 @@ router.get('/deepdivedropdown', auth, async (req, res) => {
         })
     }
 })
-router.get("/deepdive/", auth, async (req, res) => {
+
+router.post("/deepdive/", auth, async (req, res) => {
+    let results = [];
     try {
         let userId = req.body.userId;
         if (userId) {
@@ -607,11 +645,32 @@ router.get("/deepdive/", auth, async (req, res) => {
             }
             let startDate = toISOLocal(startOfWeek(date)).split('T')[0];
             let endDate = toISOLocal(endOfWeek(date)).split('T')[0];
-            const dq = `SELECT timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,flagged,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) BETWEEN '${startDate}' AND '${endDate}'`;
+            const dq = `SELECT timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,flagged,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) BETWEEN '${startDate}' AND '${endDate}'`;
             let dqr = await db.query(dq);
             if (dqr.results.length > 0) {
                 let deepdive = dqr.results;
-                let a = groupBy(deepdive, 'timecard');
+                for (let i = 0; i < deepdive.length; i++) {
+                    let screenshotUrl = await urlSigner(deepdive[i].screenshotUrl);
+                    let webcamUrl = await urlSigner(deepdive[i].webcamUrl);
+                    let r = {
+                        timecardId: deepdive[i].timecardId,
+                        timecard: deepdive[i].timecard,
+                        clientId: deepdive[i].clientId,
+                        keyCounter: deepdive[i].keyCounter,
+                        mouseCounter: deepdive[i].mouseCounter,
+                        appName: deepdive[i].appName,
+                        windowName: deepdive[i].windowName,
+                        windowUrl: deepdive[i].windowUrl,
+                        screenshotUrl,
+                        webcamUrl,
+                        flagged: deepdive[i].flagged,
+                        status: deepdive[i].status,
+                        focus: deepdive[i].focus,
+                        intensityScore: deepdive[i].intensityScore
+                    }
+                    results.push(r);
+                }
+                let a = groupBy(results, 'timecard');
                 res.send(a)
             } else {
                 res.send({
@@ -631,34 +690,4 @@ router.get("/deepdive/", auth, async (req, res) => {
     }
 })
 
-router.post("/setcookie", auth, async (req, res) => {
-    try {
-        const cookie = cloudFront.getSignedCookie({
-            policy,
-        });
-
-        res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
-            domain: '.your-domain.com',
-            path: '/',
-            httpOnly: true,
-        });
-
-        res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
-            domain: '.your-domain.com',
-            path: '/',
-            httpOnly: true,
-        });
-
-        res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
-            domain: '.your-domain.com',
-            path: '/',
-            httpOnly: true,
-        });
-
-        // Send some response
-        res.send({ message: 'Cookie Set Succesfully' });
-    } catch (e) {
-        res.send(e)
-    }
-})
 module.exports = router;
