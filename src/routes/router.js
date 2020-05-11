@@ -671,7 +671,11 @@ router.post("/deepdive/", auth, async (req, res) => {
                     results.push(r);
                 }
                 let a = groupBy(results, 'timecard');
-                res.send(a)
+                res.send({
+                    startDate,
+                    endDate,
+                    results: a
+                })
             } else {
                 res.send({
                     message: "No Results Found"
