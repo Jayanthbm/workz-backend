@@ -665,7 +665,7 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
     }
 })
 
-router.post("/deepdive/", async (req, res) => {
+router.post("/deepdive/", auth, async (req, res) => {
     let results = [];
     try {
         let userId = req.body.userId;
