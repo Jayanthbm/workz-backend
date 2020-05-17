@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const CC = require('../constants');
 const nodemailer = require('nodemailer');
 const AWS = require('aws-sdk');
+
 //Middlewares
 const auth = require('../middlewares/auth');
 
@@ -13,12 +14,14 @@ const auth = require('../middlewares/auth');
 const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
 
 //Functions
+
 //Get Name from UserId
+
 async function getManagerName(userId) {
     try {
         let m = []
         let MN = `SELECT userId,name
-            FROM user 
+            FROM user
             WHERE userId  =${userId}`;
         let MNR = await db.query(MN);
         let n = await getTeams(userId);
@@ -40,6 +43,7 @@ async function getManagerName(userId) {
 }
 
 //Get Userid from Team Id
+
 async function getUserIdfromTeam(teamId) {
     try {
         let Uid = `SELECT userId
@@ -66,6 +70,7 @@ async function getTeams(userId) {
 }
 
 //Get Array Size
+
 function getarraysize(array) {
     return array.length
 }
@@ -123,6 +128,7 @@ async function create_token(id, expiresIn) {
 }
 
 //Function to Validate Token
+
 async function validate_token(token) {
     let r;
     jwt.verify(token, CC.SECRET_KEY, async (err) => {
@@ -135,17 +141,27 @@ async function validate_token(token) {
     return r;
 }
 
-//TODO online status based on timestamp
-async function onlineStatus(timestamp) {
+//Function to decide OnlineStatus Based on Timestamp
 
+async function onlineStatus(timestamp, onlineStatus) {
+    timestamp = new Date();
+    let current = new Date();
+    const diffTime = Math.abs(current - timestamp);
+    var minutes = Math.floor(diffTime / 60000);
+    if (minutes > 15) {
+        return onlineStatus
+    } else {
+        return onlineStatus
+    }
 }
-//TODO Update Onlinestatus based on Timestamp
-//manager based query
+
+//Query to Get All Managers
 async function get_managers(teamId) {
     let results = [];
     const sql = `SELECT userId, empId, emailId, teamId, startDate, name, firstname, profilePic, profileThumbnailUrl, isManager, isActive, onlineStatus,onlineStatusTimestamp,city,message,skype,mobile  from user WHERE teamId = ${teamId} AND isManager = 1`;
     let users = await db.query(sql);
     for (let i = 0; i < users.results.length; i++) {
+        onlineStatus(users.results[0].onlineStatusTimestamp);
         let r = {
             userId: users.results[i].userId,
             empId: users.results[i].empId,
@@ -157,7 +173,7 @@ async function get_managers(teamId) {
             profilePic: users.results[i].profilePic,
             profileThumbnailUrl: users.results[i].profileThumbnailUrl,
             isActive: users.results[i].isActive,
-            onlineStatus: users.results[i].onlineStatus,
+            onlineStatus: await onlineStatus(users.results[i].onlineStatusTimestamp, users.results[i].onlineStatus),
             onlineStatusTimestamp: users.results[i].onlineStatusTimestamp,
             city: users.results[i].city,
             message: users.results[i].message,
@@ -168,6 +184,8 @@ async function get_managers(teamId) {
     }
     return results;
 }
+
+//Query to Get All Users
 
 async function get_users(teamId) {
     let results = [];
@@ -185,7 +203,7 @@ async function get_users(teamId) {
             profilePic: users.results[i].profilePic,
             profileThumbnailUrl: users.results[i].profileThumbnailUrl,
             isActive: users.results[i].isActive,
-            onlineStatus: users.results[i].onlineStatus,
+            onlineStatus: await onlineStatus(users.results[i].onlineStatusTimestamp, users.results[i].onlineStatus),
             onlineStatusTimestamp: users.results[i].onlineStatusTimestamp,
             city: users.results[i].city,
             message: users.results[i].message,
@@ -196,6 +214,8 @@ async function get_users(teamId) {
     }
     return results;
 }
+
+//Team Summary Based On TeamId and UserId
 
 async function team_summary(teamid, userId) {
     teamSummary = [];
@@ -225,11 +245,17 @@ async function team_summary(teamid, userId) {
     }
     return teamSummary
 }
+
+//Get All teams of the 
+
 async function get_teams(userId) {
     const sql = `SELECT teamId from team WHERE managerId =${userId}`;
     let teams = await db.query(sql);
     return teams.results;
 }
+
+//Manager Summary Based on TeamId
+
 async function manager_summary(teamId) {
     let ma = []
     let ms = []
@@ -248,6 +274,8 @@ async function manager_summary(teamId) {
     return ms;
 }
 
+//Function to split teams
+
 function teams_splitter(resl) {
     let result = new Set();
     resl.reduce(function (r, a) {
@@ -259,14 +287,7 @@ function teams_splitter(resl) {
     return Array.from(result);
 }
 
-async function urlSigner(url1) {
-    const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
-    let uu = cloudFront.getSignedUrl({
-        url: url1,
-        expires: Math.floor((new Date()).getTime() / 1000) + (60 * 60 * 1)
-    })
-    return uu;
-}
+//Function to Convert to date to Iso
 
 function toISOLocal(d) {
     var z = n => ('0' + n).slice(-2);
@@ -284,21 +305,33 @@ function toISOLocal(d) {
         zz(d.getMilliseconds()) +
         sign + z(off / 60 | 0) + ':' + z(off % 60);
 }
+
+//Function to Get the Start date of Week
+
 function startOfWeek(date) {
     date = new Date(date);
     var diff = date.getDate() - date.getDay() + (date.getDay() === 0 ? -6 : 1);
     return new Date(date.setDate(diff));
 }
+
+//Function to Get the Last date of Week
+
 function endOfWeek(date) {
     var lastday = date.getDate() - (date.getDay() - 1) + 6;
     return new Date(date.setDate(lastday));
 }
+
+//Function to Group Json Objects basesd on Some Key
+
 function groupBy(arr, key) {
     return (arr || []).reduce((acc, x = {}) => ({
         ...acc,
         [x[key]]: [...acc[x[key]] || [], x]
     }), {})
 }
+
+//Function to get all Team members based on teamId
+
 async function getTeamMembers(teamId) {
     const sql = `SELECT userId ,name 
                 FROM user
@@ -307,15 +340,18 @@ async function getTeamMembers(teamId) {
     let sqlR = await db.query(sql);
     return sqlR.results;
 }
+
 //Routes
 //TODO remove route during production
+
 router.get("/", async (req, res) => {
     res.send({
         message: "Hello world"
     })
 })
 
-//Form Submission ENd point Support and Demo Forms
+//Form Submission End point Support and Demo Forms
+
 router.post("/submitform", async (req, res) => {
     let name = req.body.name;
     let companyName = req.body.companyName;
@@ -508,6 +544,7 @@ router.post("/forgotpass", async (req, res) => {
 })
 
 //Update Pass route
+
 router.post("/updatepass", auth, async (req, res) => {
     let userId = req.userId;
     let password = req.body.password;
@@ -545,6 +582,8 @@ router.post("/updatepass", auth, async (req, res) => {
         }
     })
 })
+
+//Get all Users Based on ManagerId
 
 router.get("/manager/:userid", auth, async (req, res) => {
     let userId = req.params.userid;
@@ -599,6 +638,8 @@ router.get("/manager/:userid", auth, async (req, res) => {
 
 })
 
+//Get all Users Based on TeamId
+
 router.get("/teams/:teamid", auth, async (req, res) => {
     let results = [];
     let teamId = req.params.teamid;
@@ -624,6 +665,8 @@ router.get("/teams/:teamid", auth, async (req, res) => {
     })
 })
 
+//Validate User Token
+
 router.post("/validate", async (req, res) => {
     let r = await validate_token(req.body.token);
 
@@ -633,6 +676,8 @@ router.post("/validate", async (req, res) => {
         })
     }
 })
+
+//Deepdive DropDown
 
 router.post('/deepdivedropdown', auth, async (req, res) => {
     let results;
@@ -665,8 +710,9 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
     }
 })
 
+//Deepdive Route
+
 router.post("/deepdive/", auth, async (req, res) => {
-    let results = [];
     try {
         let userId = req.body.userId;
         if (userId) {
@@ -754,5 +800,55 @@ router.post("/deepdive/", auth, async (req, res) => {
     }
 })
 
+// Ram: This API is required outside of SaaS app.
+// Todo: this requires updation every time there is a change in /login authenticaiton logic
+router.post("/cServerAuth", async (req, res) => {
+    let companyname = req.body.companyname;
+    let username = req.body.username;
+    let password = req.body.password;
+    const sql = `SELECT user.userId,user.name as name,user.password,
+    company.companyId, company.timecardbreakupsize, company.enablewebcam, company.enablescreenshot
+    FROM user,company WHERE user.companyId = company.companyId
+    AND company.name= ?
+    AND (user.empId = ? or user.emailId = ?)
+    AND user.isActive = 1
+    AND company.status = "active"`;
+    try {
+        let {
+            results
+        } = await db.query(sql, [companyname, username, username]);
+        if (Object.keys(results).length === 0) {
+            res.send({
+                "auth": 0,
+                message: "No user."
+            });
+        } else {
+            let haspass = results[0].password;
+            bcrypt.compare(password, haspass, async function (err, result) {
+                if (result) {
+                    res.send({
+                        "auth": 1,
+                        "userId": results[0].userId,
+                        "userName": results[0].name,
+                        "companyId": results[0].companyId,
+                        "tcbSize": results[0].timecardbreakupsize,
+                        "webcam": results[0].enablewebcam,
+                        "screenshot": results[0].enablescreenshot
+                    })
+                } else {
+                    res.send({
+                        "auth": 0,
+                        message: "Invalid credentials."
+                    })
+                }
+            });
+        }
+    } catch (error) {
+        res.send({
+            "auth": 0,
+            message: error
+        });
+    }
+});
 
 module.exports = router;
