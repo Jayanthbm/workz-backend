@@ -333,9 +333,22 @@ function groupBy(arr, key) {
 //Function to get all Team members based on teamId
 
 async function getTeamMembers(teamId) {
+    let tid;
+    if (typeof (teamId) === 'object') {
+        teamId.forEach(element => {
+            if (typeof (tid) === 'undefined') {
+                tid = element.teamId;
+            } else {
+                tid = `${tid},${element.teamId}`;
+            }
+        });
+    } else {
+        tid = teamId
+    }
+
     const sql = `SELECT userId ,name 
                 FROM user
-                WHERE teamId =${teamId}
+                WHERE teamId IN (${tid})
                 ORDER BY name ASC`;
     let sqlR = await db.query(sql);
     return sqlR.results;
@@ -690,11 +703,11 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
             })
         } else {
             if (managerId) {
-                const getTeamId = `SELECT teamId
+                const getTeamId = `SELECT DISTINCT(teamId)
                                     FROM user   
-                                    WHERE userId = ${managerId}`;
+                                    WHERE managerId = ${managerId}`;
                 let getTeamIdR = await db.query(getTeamId);
-                results = await getTeamMembers(getTeamIdR.results[0].teamId)
+                results = await getTeamMembers(getTeamIdR.results)
             }
             if (teamId) {
                 results = await getTeamMembers(teamId);
