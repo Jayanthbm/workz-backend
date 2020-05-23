@@ -33,6 +33,7 @@ const cfurl = 'https://cdn.workforcez.net/'; // cloud front URL
 const sitedomain = 'workforcez.net';
 const cfdomain = 'cdn.workforcez.net';
 const cookieexpiry = 60;
+const CDN_URL = 'https://cdn.workforcez.net';
 module.exports = {
-    SECRET_KEY, RESETPASSLINK, cfprivateKey, cfpublickey, cfurl, sitedomain, cfdomain, cookieexpiry
+    SECRET_KEY, RESETPASSLINK, cfprivateKey, cfpublickey, cfurl, sitedomain, cfdomain, cookieexpiry, CDN_URL
 }

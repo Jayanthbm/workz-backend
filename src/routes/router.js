@@ -763,6 +763,7 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
 router.post("/deepdive/", auth, async (req, res) => {
     try {
         let userId = req.body.userId;
+        let companyId = req.body.companyId || 1;
         if (userId) {
             let date;
             if (req.body.date) {
@@ -806,8 +807,10 @@ router.post("/deepdive/", auth, async (req, res) => {
                             appName: deepdive[i].appName,
                             windowName: deepdive[i].windowName,
                             windowUrl: deepdive[i].windowUrl,
-                            screenshotUrl: deepdive[i].screenshotUrl,
-                            webcamUrl: deepdive[i].webcamUrl,
+                            screenshotUrl_thumb: CC.CDN_URL + '/' + companyId + '/' + userId + '/sslib/tmb/' + deepdive[i].screenshotUrl,
+                            screenshotUrl: CC.CDN_URL + '/' + companyId + '/' + userId + '/sslib/' + deepdive[i].screenshotUrl,
+                            webcamUrl_thumb: CC.CDN_URL + '/' + companyId + '/' + userId + '/wclib/tmb/' + deepdive[i].webcamUrl,
+                            webcamUrl: CC.CDN_URL + '/' + companyId + '/' + userId + '/wclib/' + deepdive[i].webcamUrl,
                             flagged: deepdive[i].flagged,
                             status: deepdive[i].status,
                             focus: deepdive[i].focus,
