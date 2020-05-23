@@ -449,19 +449,19 @@ router.post("/login", async (req, res) => {
                         let dp = await generate_dropdown(id);
                         if (dp) {
                             res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
-                                domain: '.localhost',
+                                domain: 'localhost',
                                 path: '/',
                                 httpOnly: true,
                             });
 
                             res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
-                                domain: '.localhost',
+                                domain: 'localhost',
                                 path: '/',
                                 httpOnly: true,
                             });
 
                             res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
-                                domain: '.localhost',
+                                domain: 'localhost',
                                 path: '/',
                                 httpOnly: true,
                             });
@@ -487,19 +487,19 @@ router.post("/login", async (req, res) => {
                         }
                     } else {
                         res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
-                            domain: '.localhost',
+                            domain: 'localhost',
                             path: '/',
                             httpOnly: true,
                         });
 
                         res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
-                            domain: '.localhost',
+                            domain: 'localhost',
                             path: '/',
                             httpOnly: true,
                         });
 
                         res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
-                            domain: '.localhost',
+                            domain: 'localhost',
                             path: '/',
                             httpOnly: true,
                         });
