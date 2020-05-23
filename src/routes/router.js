@@ -448,6 +448,24 @@ router.post("/login", async (req, res) => {
                     if (isManager === 1) {
                         let dp = await generate_dropdown(id);
                         if (dp) {
+                            res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
+                                domain: '.localhost',
+                                path: '/',
+                                httpOnly: true,
+                            });
+
+                            res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
+                                domain: '.localhost',
+                                path: '/',
+                                httpOnly: true,
+                            });
+
+                            res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
+                                domain: '.localhost',
+                                path: '/',
+                                httpOnly: true,
+                            });
+
                             res.send({
                                 token,
                                 cookieexpiry: CC.cookieexpiry,
@@ -468,6 +486,23 @@ router.post("/login", async (req, res) => {
                             })
                         }
                     } else {
+                        res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
+                            domain: '.localhost',
+                            path: '/',
+                            httpOnly: true,
+                        });
+
+                        res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
+                            domain: '.localhost',
+                            path: '/',
+                            httpOnly: true,
+                        });
+
+                        res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
+                            domain: '.localhost',
+                            path: '/',
+                            httpOnly: true,
+                        });
                         res.send({
                             token,
                             cookieexpiry: CC.cookieexpiry,
