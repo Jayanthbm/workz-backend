@@ -10,8 +10,9 @@ const corsOptions = {
 }
 app.use(cors(corsOptions));
 app.use(function (req, res, next) {
-    for (let i = 0; i < origin.length; i++) {
-        res.setHeader('Access-Control-Allow-Origin', origin[i]);
+    let org = req.get("Origin");
+    if (org) {
+        res.setHeader('Access-Control-Allow-Origin', org);
     }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');

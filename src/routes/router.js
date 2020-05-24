@@ -763,7 +763,7 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
 router.post("/deepdive/", auth, async (req, res) => {
     try {
         let userId = req.body.userId;
-        let companyId = req.body.companyId || 1;
+        let companyId = req.body.companyId || 1; //TODO remove Or Part
         if (userId) {
             let date;
             if (req.body.date) {
