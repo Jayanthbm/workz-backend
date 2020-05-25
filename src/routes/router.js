@@ -468,13 +468,7 @@ router.post("/login", async (req, res) => {
 
                             res.send({
                                 token,
-                                cookieexpiry: CC.cookieexpiry,
-                                domain: '.' + CC.cfdomain,
-                                path: '/',
-                                httpOnly: true,
-                                "CloudFront-Key-Pair-Id": cookie['CloudFront-Key-Pair-Id'],
-                                "CloudFront-Policy": cookie['CloudFront-Policy'],
-                                "CloudFront-Signature": cookie['CloudFront-Signature'],
+                                companyId,
                                 "userId": id,
                                 isManager,
                                 dropdown: dp,
@@ -505,13 +499,7 @@ router.post("/login", async (req, res) => {
                         });
                         res.send({
                             token,
-                            cookieexpiry: CC.cookieexpiry,
-                            domain: '.' + CC.cfdomain,
-                            path: '/',
-                            httpOnly: true,
-                            "CloudFront-Key-Pair-Id": cookie['CloudFront-Key-Pair-Id'],
-                            "CloudFront-Policy": cookie['CloudFront-Policy'],
-                            "CloudFront-Signature": cookie['CloudFront-Signature'],
+                            companyId,
                             "userId": id,
                             isManager,
                             email,
