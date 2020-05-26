@@ -751,84 +751,90 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
 router.post("/deepdive/", auth, async (req, res) => {
     try {
         let userId = req.body.userId;
-        let companyId = req.body.companyId || 1; //TODO remove Or Part
-        if (userId) {
-            let date;
-            if (req.body.date) {
-                date = new Date(req.body.date);
-            } else {
-                date = new Date();
-            }
-            Date.prototype.addDays = function (days) {
-                var dat = new Date(this.valueOf())
-                dat.setDate(dat.getDate() + days);
-                return dat;
-            }
+        let companyId = req.body.companyId;
+        if (companyId) {
+            if (userId) {
+                let date;
+                if (req.body.date) {
+                    date = new Date(req.body.date);
+                } else {
+                    date = new Date();
+                }
+                Date.prototype.addDays = function (days) {
+                    var dat = new Date(this.valueOf())
+                    dat.setDate(dat.getDate() + days);
+                    return dat;
+                }
 
-            function getDates(startDate, stopDate) {
-                var dateArray = new Array();
-                var currentDate = startDate;
-                while (currentDate <= stopDate) {
-                    dateArray.push(toISOLocal(currentDate).split('T')[0])
-                    currentDate = currentDate.addDays(1);
-                }
-                return dateArray;
-            }
-            var dateArray = getDates(startOfWeek(date), endOfWeek(date));
-            let rr = [];
-            async function query(date, userId) {
-                let r1 = []
-                const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,flagged,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
-                let dqr = await db.query(dq);
-                if (dqr.results.length > 0) {
-                    let deepdive = dqr.results;
-                    for (let i = 0; i < deepdive.length; i++) {
-                        let r = {
-                            timecardId: deepdive[i].timecardId,
-                            tday: deepdive[i].tday,
-                            hour: deepdive[i].hour,
-                            time: deepdive[i].time,
-                            timecard: deepdive[i].timecard,
-                            clientId: deepdive[i].clientId,
-                            keyCounter: deepdive[i].keyCounter,
-                            mouseCounter: deepdive[i].mouseCounter,
-                            appName: deepdive[i].appName,
-                            windowName: deepdive[i].windowName,
-                            windowUrl: deepdive[i].windowUrl,
-                            screenshotUrl_thumb: CC.CDN_URL + '/' + companyId + '/' + userId + '/sslib/tmb/' + deepdive[i].screenshotUrl,
-                            screenshotUrl: CC.CDN_URL + '/' + companyId + '/' + userId + '/sslib/' + deepdive[i].screenshotUrl,
-                            webcamUrl_thumb: CC.CDN_URL + '/' + companyId + '/' + userId + '/wclib/tmb/' + deepdive[i].webcamUrl,
-                            webcamUrl: CC.CDN_URL + '/' + companyId + '/' + userId + '/wclib/' + deepdive[i].webcamUrl,
-                            flagged: deepdive[i].flagged,
-                            status: deepdive[i].status,
-                            focus: deepdive[i].focus,
-                            intensityScore: deepdive[i].intensityScore
-                        }
-                        r1.push(r);
+                function getDates(startDate, stopDate) {
+                    var dateArray = new Array();
+                    var currentDate = startDate;
+                    while (currentDate <= stopDate) {
+                        dateArray.push(toISOLocal(currentDate).split('T')[0])
+                        currentDate = currentDate.addDays(1);
                     }
-                    let a = groupBy(r1, 'hour');
-                    rr.push(a)
+                    return dateArray;
                 }
-            }
-            let startDate = dateArray[0];
-            let endDate = dateArray[dateArray.length - 1];
-            for (let d = 0; d < dateArray.length; d++) {
-                await query(dateArray[d], userId)
-            }
-            if (rr.length > 0) {
-                res.send({
-                    startDate,
-                    endDate,
-                    results: rr
-                })
+                var dateArray = getDates(startOfWeek(date), endOfWeek(date));
+                let rr = [];
+                async function query(date, userId) {
+                    let r1 = []
+                    const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,flagged,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
+                    let dqr = await db.query(dq);
+                    if (dqr.results.length > 0) {
+                        let deepdive = dqr.results;
+                        for (let i = 0; i < deepdive.length; i++) {
+                            let r = {
+                                timecardId: deepdive[i].timecardId,
+                                tday: deepdive[i].tday,
+                                hour: deepdive[i].hour,
+                                time: deepdive[i].time,
+                                timecard: deepdive[i].timecard,
+                                clientId: deepdive[i].clientId,
+                                keyCounter: deepdive[i].keyCounter,
+                                mouseCounter: deepdive[i].mouseCounter,
+                                appName: deepdive[i].appName,
+                                windowName: deepdive[i].windowName,
+                                windowUrl: deepdive[i].windowUrl,
+                                screenshotUrl_thumb: CC.CDN_URL + '/' + companyId + '/' + userId + '/sslib/tmb/' + deepdive[i].screenshotUrl,
+                                screenshotUrl: CC.CDN_URL + '/' + companyId + '/' + userId + '/sslib/' + deepdive[i].screenshotUrl,
+                                webcamUrl_thumb: CC.CDN_URL + '/' + companyId + '/' + userId + '/wclib/tmb/' + deepdive[i].webcamUrl,
+                                webcamUrl: CC.CDN_URL + '/' + companyId + '/' + userId + '/wclib/' + deepdive[i].webcamUrl,
+                                flagged: deepdive[i].flagged,
+                                status: deepdive[i].status,
+                                focus: deepdive[i].focus,
+                                intensityScore: deepdive[i].intensityScore
+                            }
+                            r1.push(r);
+                        }
+                        let a = groupBy(r1, 'hour');
+                        rr.push(a)
+                    }
+                }
+                let startDate = dateArray[0];
+                let endDate = dateArray[dateArray.length - 1];
+                for (let d = 0; d < dateArray.length; d++) {
+                    await query(dateArray[d], userId)
+                }
+                if (rr.length > 0) {
+                    res.send({
+                        startDate,
+                        endDate,
+                        results: rr
+                    })
+                } else {
+                    res.send({
+                        message: "No Results Found"
+                    })
+                }
             } else {
                 res.send({
-                    message: "No Results Found"
+                    message: "Missing UserId"
                 })
             }
         } else {
             res.send({
-                message: "Missing UserId"
+                message: "Missing Company Id"
             })
         }
     } catch (e) {
