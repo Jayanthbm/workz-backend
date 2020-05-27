@@ -419,6 +419,7 @@ router.post("/login", async (req, res) => {
             let id = results[0].userId;
             let companyId = results[0].companyId;
             let email = results[0].emailId;
+            let teamId = results[0].teamId;
             let name = results[0].name;
             let firstname = results[0].firstname;
             let profilePic = results[0].profilePic;
@@ -469,6 +470,7 @@ router.post("/login", async (req, res) => {
                             res.send({
                                 token,
                                 companyId,
+                                teamId,
                                 "userId": id,
                                 isManager,
                                 dropdown: dp,
@@ -500,6 +502,7 @@ router.post("/login", async (req, res) => {
                         res.send({
                             token,
                             companyId,
+                            teamId,
                             "userId": id,
                             isManager,
                             email,
@@ -716,32 +719,38 @@ router.post("/validate", async (req, res) => {
 //Deepdive DropDown
 
 router.post('/deepdivedropdown', auth, async (req, res) => {
-    let results;
-    let managerId = req.body.managerId;
-    let teamId = req.body.teamId;
-    if (managerId || teamId) {
-        if (managerId && teamId) {
-            res.send({
-                message: "Both ManagerId and Teamid Passed"
-            })
-        } else {
-            if (managerId) {
-                const getTeamId = `SELECT DISTINCT(teamId)
+    try {
+        let results;
+        let managerId = req.body.managerId;
+        let teamId = req.body.teamId;
+        if (managerId || teamId) {
+            if (managerId && teamId) {
+                res.send({
+                    message: "Both ManagerId and Teamid Passed"
+                })
+            } else {
+                if (managerId) {
+                    const getTeamId = `SELECT DISTINCT(teamId)
                                     FROM user   
                                     WHERE managerId = ${managerId}`;
-                let getTeamIdR = await db.query(getTeamId);
-                results = await getTeamMembers(getTeamIdR.results)
+                    let getTeamIdR = await db.query(getTeamId);
+                    results = await getTeamMembers(getTeamIdR.results)
+                }
+                if (teamId) {
+                    results = await getTeamMembers(teamId);
+                }
+                if (results) {
+                    res.send(results)
+                }
             }
-            if (teamId) {
-                results = await getTeamMembers(teamId);
-            }
-            if (results) {
-                res.send(results)
-            }
+        } else {
+            res.send({
+                message: "Missing Fields"
+            })
         }
-    } else {
+    } catch (error) {
         res.send({
-            message: "Missing Fields"
+            message: "Error"
         })
     }
 })
