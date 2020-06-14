@@ -32,7 +32,7 @@ const cfpublickey = 'APKAIMZUNS62HHFBQPHQ'; // cloud front public key
 const cfurl = 'https://cdn.workforcez.net/'; // cloud front URL
 const sitedomain = 'workforcez.net';
 const cfdomain = 'cdn.workforcez.net';
-const cookieexpiry = 60;
+const cookieexpiry = 180;
 const CDN_URL = 'https://cdn.workforcez.net';
 module.exports = {
     SECRET_KEY, RESETPASSLINK, cfprivateKey, cfpublickey, cfurl, sitedomain, cfdomain, cookieexpiry, CDN_URL
