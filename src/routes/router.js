@@ -16,7 +16,6 @@ const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
 //Functions
 
 //Get Name from UserId
-
 async function getManagerName(userId) {
     try {
         let m = []
@@ -41,7 +40,22 @@ async function getManagerName(userId) {
     } catch (e) {
     }
 }
-
+//Company Info
+async function getCompanyInfo(companyId) {
+    const cQ = `SELECT companyId,name,billingPlan,billingRate,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot
+                FROM company
+                WHERE companyId =${companyId}`;
+    let cQR = await db.query(cQ);
+    return cQR.results[0];
+}
+//UserInfo
+async function getUserInfo(userId) {
+    const uQ = `SELECT userId,companyId,empId,emailId,teamId,managerId,name,firstname,isManager,isActive
+                FROM user
+                WHERE userId =${userId}`;
+    let uQR = await db.query(uQ);
+    return uQR.results[0];
+}
 //Get Userid from Team Id
 
 async function getUserIdfromTeam(teamId) {
@@ -77,42 +91,47 @@ function getarraysize(array) {
 
 //Function to Generate Dropdown
 
-async function generate_dropdown(userId) {
+async function generate_dropdown(userId, isManager) {
     try {
         let dp = [];
-        //Get the main team of user
-        let MQ = `SELECT user.teamId,team.name
+        if (isManager === 1) {
+            //Get the main team of user
+            let MQ = `SELECT user.teamId,team.name
             FROM user,team 
             WHERE user.userId = ${userId} AND user.teamId = team.teamId`;
-        let MQR = await db.query(MQ);
-        dp.push(MQR.results[0])
-        await a(userId);
-        //get the teams of user
-        async function a(userId) {
-            let T = await getTeams(userId);
-            let mn = await getManagerName(userId)
-            dp[getarraysize(dp)] = mn
-            dp[getarraysize(dp) - 1]['teams'] = T;
-            // if (T.length > 1) {
-            //     let mn = await getManagerName(userId)
-            //     dp[getarraysize(dp)] = mn
-            //     dp[getarraysize(dp) - 1]['teams'] = T;
-            // } else {
-            //     dp[getarraysize(dp)] = T;
-            // }
-            for (let i = 0; i < T.length; i++) {
-                let uid = await getUserIdfromTeam(T[i].teamId);
-                if (uid) {
-                    for (let j = 0; j < uid.length; j++) {
-                        await a(uid[j].userId)
+            let MQR = await db.query(MQ);
+            dp.push(MQR.results[0])
+            await a(userId);
+            //get the teams of user
+            async function a(userId) {
+                let T = await getTeams(userId);
+                let mn = await getManagerName(userId)
+                dp[getarraysize(dp)] = mn
+                dp[getarraysize(dp) - 1]['teams'] = T;
+                for (let i = 0; i < T.length; i++) {
+                    let uid = await getUserIdfromTeam(T[i].teamId);
+                    if (uid) {
+                        for (let j = 0; j < uid.length; j++) {
+                            await a(uid[j].userId)
+                        }
+                    } else {
+                        return
                     }
-                } else {
-                    return
                 }
             }
         }
+        if (isManager === 0) {
+            const tQ = `SELECT user.teamId,team.name
+                        FROM user,team
+                        WHERE user.teamId = team.teamId AND userId =${userId}`;
+            let tQR = await db.query(tQ);
+            for (r of tQR.results) {
+                dp.push(r)
+            }
+        }
         return dp;
-    } catch (e) {
+    } catch (error) {
+        console.log(error);
     }
 }
 
@@ -405,7 +424,7 @@ router.post("/login", async (req, res) => {
     let companyname = req.body.companyname;
     let username = req.body.username;
     let password = req.body.password;
-    const sql = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') `;
+    const sql = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') AND  user.isActive =1 AND company.status='active' `;
     try {
         let {
             results
@@ -420,13 +439,11 @@ router.post("/login", async (req, res) => {
             let companyId = results[0].companyId;
             let email = results[0].emailId;
             let teamId = results[0].teamId;
-            let name = results[0].name;
             let firstname = results[0].firstname;
             let profilePic = results[0].profilePic;
             let profileThumbnailUrl = results[0].profileThumbnailUrl;
             let isManager = results[0].isManager;
             let previousPassword = results[0].previousPassword;
-            let managerId = results[0].managerId;
             const policy = JSON.stringify({
                 Statement: [
                     {
@@ -446,48 +463,13 @@ router.post("/login", async (req, res) => {
             bcrypt.compare(password, haspass, async function (err, result) {
                 if (result) {
                     const token = await create_token(id, '3h')
-                    if (isManager === 1) {
-                        let dp = await generate_dropdown(id);
-                        if (dp) {
-                            res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
-                                domain: 'localhost',
-                                path: '/',
-                                httpOnly: true,
-                            });
-
-                            res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
-                                domain: 'localhost',
-                                path: '/',
-                                httpOnly: true,
-                            });
-
-                            res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
-                                domain: 'localhost',
-                                path: '/',
-                                httpOnly: true,
-                            });
-
-                            res.send({
-                                token,
-                                companyId,
-                                teamId,
-                                "userId": id,
-                                isManager,
-                                dropdown: dp,
-                                email,
-                                firstname,
-                                profilePic,
-                                profileThumbnailUrl,
-                                previousPassword
-                            })
-                        }
-                    } else {
+                    let dp = await generate_dropdown(id, isManager);
+                    if (dp) {
                         res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
                             domain: 'localhost',
                             path: '/',
                             httpOnly: true,
                         });
-
                         res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
                             domain: 'localhost',
                             path: '/',
@@ -505,6 +487,7 @@ router.post("/login", async (req, res) => {
                             teamId,
                             "userId": id,
                             isManager,
+                            dropdown: dp,
                             email,
                             firstname,
                             profilePic,
@@ -730,14 +713,31 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
                 })
             } else {
                 if (managerId) {
-                    const getTeamId = `SELECT DISTINCT(teamId)
+                    let uR = await getUserInfo(req.userId);
+                    if (uR.isManager === 1) {
+                        const getTeamId = `SELECT DISTINCT(teamId)
                                     FROM user   
                                     WHERE managerId = ${managerId}`;
-                    let getTeamIdR = await db.query(getTeamId);
-                    results = await getTeamMembers(getTeamIdR.results)
+                        let getTeamIdR = await db.query(getTeamId);
+                        results = await getTeamMembers(getTeamIdR.results)
+                    }
+                    if (uR.isManager === 0) {
+                        res.send({
+                            message: "You dont have Access"
+                        })
+                    }
                 }
                 if (teamId) {
-                    results = await getTeamMembers(teamId);
+                    let uR = await getUserInfo(req.userId);
+                    if (uR.isManager === 1) {
+                        results = await getTeamMembers(teamId);
+                    }
+                    if (uR.isManager === 0) {
+                        results = {
+                            userId: uR.userId,
+                            name: uR.name
+                        }
+                    }
                 }
                 if (results) {
                     res.send(results)
@@ -750,7 +750,8 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
         }
     } catch (error) {
         res.send({
-            message: "Error"
+            message: "Error",
+            e: error
         })
     }
 })
@@ -760,8 +761,22 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
 router.post("/deepdive/", auth, async (req, res) => {
     try {
         let userId = req.body.userId;
+        let userInfo = await getUserInfo(req.userId);
+        if (userInfo.isManager === 0) {
+            if (userInfo.userId != userId) {
+                res.send({
+                    message: "You dont have Access"
+                })
+            }
+        }
         let companyId = req.body.companyId;
         if (companyId) {
+            let companyInfo = await getCompanyInfo(companyId);
+            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 0) {
+                res.send({
+                    message: "Both Webcam and Screenshot disabled "
+                })
+            }
             if (userId) {
                 let date;
                 if (req.body.date) {
@@ -788,33 +803,79 @@ router.post("/deepdive/", auth, async (req, res) => {
                 let rr = [];
                 async function query(date, userId) {
                     let r1 = []
-                    const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,flagged,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
+                    const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
                     let dqr = await db.query(dq);
                     if (dqr.results.length > 0) {
                         let deepdive = dqr.results;
                         for (let i = 0; i < deepdive.length; i++) {
-                            let r = {
-                                timecardId: deepdive[i].timecardId,
-                                tday: deepdive[i].tday,
-                                hour: deepdive[i].hour,
-                                time: deepdive[i].time,
-                                timecard: deepdive[i].timecard,
-                                clientId: deepdive[i].clientId,
-                                keyCounter: deepdive[i].keyCounter,
-                                mouseCounter: deepdive[i].mouseCounter,
-                                appName: deepdive[i].appName,
-                                windowName: deepdive[i].windowName,
-                                windowUrl: deepdive[i].windowUrl,
-                                screenshotUrl_thumb: CC.CDN_URL + '/' + companyId + '/' + userId + '/sslib/tmb/' + deepdive[i].screenshotUrl,
-                                screenshotUrl: CC.CDN_URL + '/' + companyId + '/' + userId + '/sslib/' + deepdive[i].screenshotUrl,
-                                webcamUrl_thumb: CC.CDN_URL + '/' + companyId + '/' + userId + '/wclib/tmb/' + deepdive[i].webcamUrl,
-                                webcamUrl: CC.CDN_URL + '/' + companyId + '/' + userId + '/wclib/' + deepdive[i].webcamUrl,
-                                flagged: deepdive[i].flagged,
-                                status: deepdive[i].status,
-                                focus: deepdive[i].focus,
-                                intensityScore: deepdive[i].intensityScore
+                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
+                                let r = {
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timecard: deepdive[i].timecard,
+                                    clientId: deepdive[i].clientId,
+                                    keyCounter: deepdive[i].keyCounter,
+                                    mouseCounter: deepdive[i].mouseCounter,
+                                    appName: deepdive[i].appName,
+                                    windowName: deepdive[i].windowName,
+                                    windowUrl: deepdive[i].windowUrl,
+                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                    flagged: deepdive[i].flagged,
+                                    status: deepdive[i].status,
+                                    focus: deepdive[i].focus,
+                                    intensityScore: deepdive[i].intensityScore
+                                }
+                                r1.push(r);
                             }
-                            r1.push(r);
+                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 0) {
+                                let r = {
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timecard: deepdive[i].timecard,
+                                    clientId: deepdive[i].clientId,
+                                    keyCounter: deepdive[i].keyCounter,
+                                    mouseCounter: deepdive[i].mouseCounter,
+                                    appName: deepdive[i].appName,
+                                    windowName: deepdive[i].windowName,
+                                    windowUrl: deepdive[i].windowUrl,
+                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                    flagged: deepdive[i].flagged,
+                                    status: deepdive[i].status,
+                                    focus: deepdive[i].focus,
+                                    intensityScore: deepdive[i].intensityScore
+                                }
+                                r1.push(r);
+                            }
+                            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 1) {
+                                let r = {
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timecard: deepdive[i].timecard,
+                                    clientId: deepdive[i].clientId,
+                                    keyCounter: deepdive[i].keyCounter,
+                                    mouseCounter: deepdive[i].mouseCounter,
+                                    appName: deepdive[i].appName,
+                                    windowName: deepdive[i].windowName,
+                                    windowUrl: deepdive[i].windowUrl,
+                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                    flagged: deepdive[i].flagged,
+                                    status: deepdive[i].status,
+                                    focus: deepdive[i].focus,
+                                    intensityScore: deepdive[i].intensityScore
+                                }
+                                r1.push(r);
+                            }
                         }
                         let a = groupBy(r1, 'hour');
                         rr.push(a)
@@ -850,6 +911,41 @@ router.post("/deepdive/", auth, async (req, res) => {
         res.send({
             message: "Error",
             e
+        })
+    }
+})
+
+router.post("/flag/:timecard", auth, async (req, res) => {
+    try {
+        let userInfo = await getUserInfo(req.userId);
+        let timecardId = req.params.timecard;
+        if (timecardId) {
+            if (userInfo.isManager === 1) {
+                const FlagQuery = `UPDATE timecard set status='flagged' WHERE timecardId=${timecardId}`;
+                let FlagQueryR = await db.query(FlagQuery);
+                if (FlagQueryR.results.affectedRows === 1) {
+                    res.send({
+                        message: "Successfully Flagged"
+                    })
+                } else {
+                    res.send({
+                        message: "Timecard with the specified ID Not Found"
+                    })
+                }
+            } else {
+                res.send({
+                    message: "You don't have access to flag timcard"
+                })
+            }
+        } else {
+            res.send({
+                message: "No timecard specified to Flag"
+            })
+        }
+    } catch (error) {
+        res.send({
+            message: "Error",
+            e: error
         })
     }
 })
