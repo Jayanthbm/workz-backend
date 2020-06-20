@@ -373,6 +373,22 @@ async function getTeamMembers(teamId) {
     return sqlR.results;
 }
 
+//Date Handler
+
+function getDates(startDate, stopDate) {
+    var dateArray = new Array();
+    var currentDate = startDate;
+    Date.prototype.addDays = function (days) {
+        var dat = new Date(this.valueOf())
+        dat.setDate(dat.getDate() + days);
+        return dat;
+    }
+    while (currentDate <= stopDate) {
+        dateArray.push(toISOLocal(currentDate).split('T')[0])
+        currentDate = currentDate.addDays(1);
+    }
+    return dateArray;
+}
 //Routes
 //TODO remove route during production
 
@@ -784,23 +800,11 @@ router.post("/deepdive/", auth, async (req, res) => {
                 } else {
                     date = new Date();
                 }
-                Date.prototype.addDays = function (days) {
-                    var dat = new Date(this.valueOf())
-                    dat.setDate(dat.getDate() + days);
-                    return dat;
-                }
-
-                function getDates(startDate, stopDate) {
-                    var dateArray = new Array();
-                    var currentDate = startDate;
-                    while (currentDate <= stopDate) {
-                        dateArray.push(toISOLocal(currentDate).split('T')[0])
-                        currentDate = currentDate.addDays(1);
-                    }
-                    return dateArray;
-                }
                 var dateArray = getDates(startOfWeek(date), endOfWeek(date));
                 let rr = [];
+                let totaltimecards = 0;
+                let totalIntensity = 0;
+                let totalFocus = 0;
                 async function query(date, userId) {
                     let r1 = []
                     const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
@@ -808,6 +812,9 @@ router.post("/deepdive/", auth, async (req, res) => {
                     if (dqr.results.length > 0) {
                         let deepdive = dqr.results;
                         for (let i = 0; i < deepdive.length; i++) {
+                            totaltimecards = totaltimecards + 1;
+                            totalIntensity = totalIntensity + deepdive[i].intensityScore;
+                            totalFocus = totalFocus + deepdive[i].focus;
                             if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
                                 let r = {
                                     timecardId: deepdive[i].timecardId,
@@ -887,6 +894,9 @@ router.post("/deepdive/", auth, async (req, res) => {
                     res.send({
                         startDate,
                         endDate,
+                        totalMinutes: totaltimecards * companyInfo.timecardsize,
+                        AverageIntensity: totalIntensity / totaltimecards,
+                        AverageFocus: totalFocus / totaltimecards,
                         results: rr
                     })
                 } else {
@@ -912,6 +922,145 @@ router.post("/deepdive/", auth, async (req, res) => {
     }
 })
 
+router.post("/details", auth, async (req, res) => {
+    try {
+        let userId = req.body.userId;
+        let userInfo = await getUserInfo(req.userId);
+        if (userInfo.isManager === 0) {
+            if (userInfo.userId != userId) {
+                res.send({
+                    message: "You dont have Access"
+                })
+            }
+        }
+        let companyId = req.body.companyId;
+        if (companyId) {
+            let companyInfo = await getCompanyInfo(companyId);
+            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 0) {
+                res.send({
+                    message: "Both Webcam and Screenshot disabled "
+                })
+            }
+            if (userId) {
+                let date;
+                if (req.body.date) {
+                    date = new Date(req.body.date);
+                } else {
+                    date = new Date();
+                }
+                var dateArray = getDates(startOfWeek(date), endOfWeek(date));
+                let rr = [];
+                async function query(date, userId) {
+                    let r1 = []
+                    const dq = `SELECT DAYNAME(timeCardBreakup)as tday,HOUR(timeCardBreakup) as hour,TIME(timeCardBreakup) as time,timecardBreakupId,timecardId,timeCardBreakup,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,managerComment,commentShared FROM  timecardBreakup WHERE userId=${userId} AND DATE(timeCardBreakup) = '${date}'`;
+                    let dqr = await db.query(dq);
+                    if (dqr.results.length > 0) {
+                        let deepdive = dqr.results;
+                        for (let i = 0; i < deepdive.length; i++) {
+                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
+                                let r = {
+                                    timecardBreakupId: deepdive[i].timecardBreakupId,
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timeCardBreakup: deepdive[i].timeCardBreakup,
+                                    clientId: deepdive[i].clientId,
+                                    keyCounter: deepdive[i].keyCounter,
+                                    mouseCounter: deepdive[i].mouseCounter,
+                                    appName: deepdive[i].appName,
+                                    windowName: deepdive[i].windowName,
+                                    windowUrl: deepdive[i].windowUrl,
+                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                    managerComment: deepdive[i].managerComment,
+                                    commentShared: deepdive[i].commentShared,
+                                }
+                                r1.push(r);
+                            }
+                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 0) {
+                                let r = {
+                                    timecardBreakupId: deepdive[i].timecardBreakupId,
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timeCardBreakup: deepdive[i].timeCardBreakup,
+                                    clientId: deepdive[i].clientId,
+                                    keyCounter: deepdive[i].keyCounter,
+                                    mouseCounter: deepdive[i].mouseCounter,
+                                    appName: deepdive[i].appName,
+                                    windowName: deepdive[i].windowName,
+                                    windowUrl: deepdive[i].windowUrl,
+                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                    managerComment: deepdive[i].managerComment,
+                                    commentShared: deepdive[i].commentShared,
+                                }
+                                r1.push(r);
+                            }
+                            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 1) {
+                                let r = {
+                                    timecardBreakupId: deepdive[i].timecardBreakupId,
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timeCardBreakup: deepdive[i].timeCardBreakup,
+                                    clientId: deepdive[i].clientId,
+                                    keyCounter: deepdive[i].keyCounter,
+                                    mouseCounter: deepdive[i].mouseCounter,
+                                    appName: deepdive[i].appName,
+                                    windowName: deepdive[i].windowName,
+                                    windowUrl: deepdive[i].windowUrl,
+                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                    managerComment: deepdive[i].managerComment,
+                                    commentShared: deepdive[i].commentShared,
+                                }
+                                r1.push(r);
+                            }
+                        }
+                        let a = groupBy(r1, 'hour');
+                        rr.push(a)
+                    }
+                }
+                let startDate = dateArray[0];
+                let endDate = dateArray[dateArray.length - 1];
+                for (let d = 0; d < dateArray.length; d++) {
+                    await query(dateArray[d], userId)
+                }
+                if (rr.length > 0) {
+                    res.send({
+                        startDate,
+                        endDate,
+                        results: rr
+                    })
+                } else {
+                    res.send({
+                        message: "No Results Found"
+                    })
+                }
+            } else {
+                res.send({
+                    message: "Missing UserId"
+                })
+            }
+        } else {
+            res.send({
+                message: "Missing Company Id"
+            })
+        }
+    } catch (error) {
+        res.send({
+            message: "Error",
+            error
+        })
+    }
+})
+//Flagging Timecard
 router.post("/flag/:timecard", auth, async (req, res) => {
     try {
         let userInfo = await getUserInfo(req.userId);
@@ -931,7 +1080,7 @@ router.post("/flag/:timecard", auth, async (req, res) => {
                 }
             } else {
                 res.send({
-                    message: "You don't have access to flag timcard"
+                    message: "You don't have access to flag timecard"
                 })
             }
         } else {
@@ -947,6 +1096,26 @@ router.post("/flag/:timecard", auth, async (req, res) => {
     }
 })
 
+//Timecard Breakup data from timecardId
+router.get("/timecard/:tcard", auth, async (req, res) => {
+    try {
+        let tcard = req.params.tcard;
+        if (tcard) {
+            const sql = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,managerComment,commentShared 
+                WHERE timecardId =${tcard}`;
+            let sqlR = await db.query(sql);
+        } else {
+            res.send({
+                message: "No Timecard Specified"
+            })
+        }
+    } catch (error) {
+        res.send({
+            message: "Error",
+            e: error
+        })
+    }
+})
 // Ram: This API is required outside of SaaS app.
 // Todo: this requires updation every time there is a change in /login authenticaiton logic
 router.post("/cServerAuth", async (req, res) => {
