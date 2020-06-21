@@ -526,6 +526,27 @@ router.post("/login", async (req, res) => {
     }
 })
 
+//Logout Route to clear Cookies
+router.post("/logout", async (req, res) => {
+    res.clearCookie('CloudFront-Key-Pair-Id', {
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+    });
+    res.clearCookie('CloudFront-Policy', {
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+    });
+    res.clearCookie('CloudFront-Signature', {
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+    });
+    res.send({
+        message: "Cookie Cleared"
+    })
+})
 //Forgot Password Route
 
 router.post("/forgotpass", async (req, res) => {
@@ -918,6 +939,66 @@ router.post("/deepdive/", auth, async (req, res) => {
         res.send({
             message: "Error",
             e
+        })
+    }
+})
+
+router.post("/breakup/:timecard", auth, async (req, res) => {
+    try {
+        let timecardId = req.params.timecard;
+        let userInfo = await getUserInfo(req.userId);
+        let comapanyInfo = await getCompanyInfo(userInfo.companyId);
+        if (timecardId) {
+            //Get all timecard data
+            const tQ = `SELECT YEAR(timecard) as timecardYear,MONTH(timecard) as timecardMonth,DAY(timecard)as timecardDay,HOUR(timecard) as timecardHour,MINUTE(timecard) as timecardMinute,timecard,userId,focus,intensityScore
+            FROM timecard 
+            WHERE timecardId = ${timecardId}`;
+            let tQR = await db.query(tQ);
+            let timecardYear = tQR.results[0].timecardYear;
+            let timecardMonth = tQR.results[0].timecardMonth;
+            let timecardDay = tQR.results[0].timecardDay;
+            let timecardHour = tQR.results[0].timecardHour;
+            let timecardMinute = tQR.results[0].timecardMinute;
+            let timecard = tQR.results[0].timecard;
+            let userId = tQR.results[0].userId;
+            let focus = tQR.results[0].focus;
+            let intensityScore = tQR.results[0].intensityScore;
+
+            //Querying from Timecard Breakup table
+
+            const tBQ = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,screenshotUrl,webcamUrl,managerComment,commentShared 
+            FROM timecardBreakup WHERE userId = ${userId} AND YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND MINUTE(timeCardBreakup) BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize}`;
+            let tBQR = await db.query(tBQ);
+            let tB = tBQR.results;
+            let rr = [];
+            for (let i = 0; i < tB.length; i++) {
+                let r = {
+                    timecardBreakupId: tB[i].timecardBreakupId,
+                    timeCardBreakup: tB[i].timeCardBreakup,
+                    userId: tB[i].userId,
+                    clientId: tB[i].clientId,
+                    screenshotUrl: `${CC.CDN_URL}/${userInfo.companyId}/${userId}/sslib/${tB[i].screenshotUrl}`,
+                    webcamUrl: `${CC.CDN_URL}/${userInfo.companyId}/${userId}/wclib/${tB[i].webcamUrl}`,
+                    managerComment: tB[i].managerComment,
+                    commentShared: tB[i].commentShared,
+                }
+                rr.push(r)
+            }
+            res.send({
+                timecard,
+                focus,
+                intensityScore,
+                results: rr
+            })
+        } else {
+            res.send({
+                message: "Missing TimecardId"
+            })
+        }
+    } catch (error) {
+        res.send({
+            message: Error,
+            error
         })
     }
 })
