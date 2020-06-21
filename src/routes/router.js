@@ -489,6 +489,7 @@ router.post("/login", async (req, res) => {
                             path: '/',
                             httpOnly: true,
                         });
+
                         res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
                             domain: 'localhost',
                             path: '/',
@@ -1195,7 +1196,7 @@ router.post("/cServerAuth", async (req, res) => {
     let username = req.body.username;
     let password = req.body.password;
     const sql = `SELECT user.userId,user.name as name,user.password,
-    company.companyId, company.timecardbreakupsize, company.enablewebcam, company.enablescreenshot
+    company.companyId, company.timecardsize, company.timecardbreakupsize, company.enablewebcam, company.enablescreenshot
     FROM user,company WHERE user.companyId = company.companyId
     AND company.name= ?
     AND (user.empId = ? or user.emailId = ?)
@@ -1219,6 +1220,7 @@ router.post("/cServerAuth", async (req, res) => {
                         "userId": results[0].userId,
                         "userName": results[0].name,
                         "companyId": results[0].companyId,
+                        "tcSize": results[0].timecardsize,
                         "tcbSize": results[0].timecardbreakupsize,
                         "webcam": results[0].enablewebcam,
                         "screenshot": results[0].enablescreenshot
