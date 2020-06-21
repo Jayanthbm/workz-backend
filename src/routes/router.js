@@ -443,7 +443,7 @@ router.post("/login", async (req, res) => {
     let companyname = req.body.companyname;
     let username = req.body.username;
     let password = req.body.password;
-    const sql = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') AND  user.isActive =1 AND company.status='active' `;
+    const sql = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') AND  user.isActive =1 AND company.status='active'`;
     try {
         let {
             results
@@ -530,6 +530,7 @@ router.post("/login", async (req, res) => {
 })
 
 //Logout Route to clear Cookies
+
 router.post("/logout", async (req, res) => {
     res.clearCookie('CloudFront-Key-Pair-Id', {
         domain: 'localhost',
@@ -550,6 +551,7 @@ router.post("/logout", async (req, res) => {
         message: "Cookie Cleared"
     })
 })
+
 //Forgot Password Route
 
 router.post("/forgotpass", async (req, res) => {
@@ -946,6 +948,8 @@ router.post("/deepdive/", auth, async (req, res) => {
     }
 })
 
+//Timecard Breakup data from timecardId
+
 router.post("/breakup/:timecard", auth, async (req, res) => {
     try {
         let timecardId = req.params.timecard;
@@ -1005,6 +1009,8 @@ router.post("/breakup/:timecard", auth, async (req, res) => {
         })
     }
 })
+
+//Details Route
 
 router.post("/details", auth, async (req, res) => {
     try {
@@ -1144,7 +1150,9 @@ router.post("/details", auth, async (req, res) => {
         })
     }
 })
+
 //Flagging Timecard
+
 router.post("/flag/:timecard", auth, async (req, res) => {
     try {
         let userInfo = await getUserInfo(req.userId);
@@ -1180,26 +1188,6 @@ router.post("/flag/:timecard", auth, async (req, res) => {
     }
 })
 
-//Timecard Breakup data from timecardId
-router.get("/timecard/:tcard", auth, async (req, res) => {
-    try {
-        let tcard = req.params.tcard;
-        if (tcard) {
-            const sql = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,managerComment,commentShared 
-                WHERE timecardId =${tcard}`;
-            let sqlR = await db.query(sql);
-        } else {
-            res.send({
-                message: "No Timecard Specified"
-            })
-        }
-    } catch (error) {
-        res.send({
-            message: "Error",
-            e: error
-        })
-    }
-})
 // Ram: This API is required outside of SaaS app.
 // Todo: this requires updation every time there is a change in /login authenticaiton logic
 router.post("/cServerAuth", async (req, res) => {
