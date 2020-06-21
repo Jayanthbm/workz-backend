@@ -16,6 +16,7 @@ const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
 //Functions
 
 //Get Name from UserId
+
 async function getManagerName(userId) {
     try {
         let m = []
@@ -40,7 +41,9 @@ async function getManagerName(userId) {
     } catch (e) {
     }
 }
+
 //Company Info
+
 async function getCompanyInfo(companyId) {
     const cQ = `SELECT companyId,name,billingPlan,billingRate,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot
                 FROM company
