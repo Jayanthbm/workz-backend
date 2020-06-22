@@ -476,7 +476,7 @@ router.post("/login", async (req, res) => {
                 if (err) {
                     res.send({
                         message: "Error in Login",
-                        message: err
+                        e: err
                     })
                 }
                 if (result) {
