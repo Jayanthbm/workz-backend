@@ -318,14 +318,7 @@ function toISOLocal(d) {
     var sign = off < 0 ? '+' : '-';
     off = Math.abs(off);
 
-    return d.getFullYear() + '-'
-        + z(d.getMonth() + 1) + '-' +
-        z(d.getDate()) + 'T' +
-        z(d.getHours()) + ':' +
-        z(d.getMinutes()) + ':' +
-        z(d.getSeconds()) + '.' +
-        zz(d.getMilliseconds()) +
-        sign + z(off / 60 | 0) + ':' + z(off % 60);
+    return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}.${zz(d.getMilliseconds())}${sign}${z(off / 60 | 0)}:${z(off % 60)}`;
 }
 
 //Function to Get the Start date of Week
@@ -395,7 +388,7 @@ function getDates(startDate, stopDate) {
 //Routes
 //TODO remove route during production
 
-router.get("/", async (req, res) => {
+router.get("/", async (_req, res) => {
     res.send({
         message: "Hello world"
     })
@@ -480,6 +473,12 @@ router.post("/login", async (req, res) => {
                 policy,
             });
             bcrypt.compare(password, haspass, async function (err, result) {
+                if (err) {
+                    res.send({
+                        message: "Error in Login",
+                        message: err
+                    })
+                }
                 if (result) {
                     const token = await create_token(id, '3h')
                     let dp = await generate_dropdown(id, isManager);
@@ -533,6 +532,7 @@ router.post("/login", async (req, res) => {
 //Logout Route to clear Cookies
 
 router.post("/logout", async (req, res) => {
+    console.log(req);
     res.clearCookie('CloudFront-Key-Pair-Id', {
         domain: 'localhost',
         path: '/',
@@ -620,12 +620,24 @@ router.post("/updatepass", auth, async (req, res) => {
     } = await db.query(sql);
     oldPass = results[0].password;
     bcrypt.compare(password, oldPass, function (err, result) {
+        if (err) {
+            res.send({
+                message: "Error",
+                e: err
+            });
+        }
         if (result === true) {
             res.send({
                 message: "You can't use the Previous Password"
             })
         } else {
             bcrypt.hash(password, 10, async function (err, hash) {
+                if (err) {
+                    res.send({
+                        message: "Error",
+                        e: err
+                    });
+                }
                 if (hash) {
                     const sql1 = `UPDATE user set password = '${hash}',previousPassword='${oldPass}' where userId =${userId} `;
                     try {
@@ -656,7 +668,6 @@ router.get("/manager/:userid", auth, async (req, res) => {
     const checkquery = `SELECT teamId,managerId,isManager from user WHERE userId = ${userId}`;
     let checkResults = await db.query(checkquery);
     let teamId = checkResults.results[0].teamId;
-    let managerId = checkResults.results[0].managerId;
     let isManager = checkResults.results[0].isManager;
     if (isManager === 1) {
         const sql = `SELECT teamId,name from team WHERE managerId = ${userId}`;
