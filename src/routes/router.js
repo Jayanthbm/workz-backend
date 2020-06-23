@@ -1201,6 +1201,96 @@ router.post("/flag/:timecard", auth, async (req, res) => {
     }
 })
 
+router.post("/comment/:id", auth, async (req, res) => {
+    try {
+        let timecardBreakupId = req.params.id;
+        let userInfo = await getUserInfo(req.userId);
+        var today = new Date();
+        var date = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
+        var time = today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
+        var dateTime = date + ' ' + time;
+        if (timecardBreakupId) {
+            let comment = req.body.comment;
+            if (comment) {
+                const sql = `SELECT managerComment
+                            FROM timecardBreakup
+                            WHERE timecardBreakupId = ${timecardBreakupId}`;
+                let sqlR = await db.query(sql);
+                if (sqlR.results.length > 0) {
+                    let managerComment = sqlR.results[0].managerComment;
+                    let mc = JSON.parse(managerComment) || [];
+                    mc.push({
+                        dateTime,
+                        from: userInfo.name,
+                        message: comment
+                    })
+                    const IQ = `UPDATE timecardBreakup
+                        SET managerComment = '${JSON.stringify(mc)}'
+                        WHERE timecardBreakupId=${timecardBreakupId}`;
+                    let IQR = await db.query(IQ);
+                    if (IQR.results.affectedRows > 0) {
+                        res.send({
+                            message: "Comment Sent"
+                        })
+                    } else {
+                        res.send({
+                            message: "Error During Updating Comment"
+                        })
+                    }
+                } else {
+                    res.send({
+                        message: "Wrong timecardBreakupId"
+                    })
+                }
+            } else {
+                res.send({
+                    message: "Missing Data"
+                })
+            }
+        } else {
+            res.send({
+                message: "No timecardBreakupId Specified"
+            })
+        }
+    } catch (error) {
+        res.send({
+            message: "Error",
+            error
+        })
+    }
+})
+
+router.get("/comment/:id", auth, async (req, res) => {
+    try {
+        let timecardBreakupId = req.params.id;
+        if (timecardBreakupId) {
+            const sql = `SELECT managerComment
+                            FROM timecardBreakup
+                            WHERE timecardBreakupId = ${timecardBreakupId}`;
+            let sqlR = await db.query(sql);
+            if (sqlR.results.length > 0) {
+                res.send({
+                    message: JSON.parse(sqlR.results[0].managerComment)
+                })
+            } else {
+                res.send({
+                    message: "Wrong timecardBreakupId"
+                })
+            }
+        } else {
+            res.send({
+                message: "No timecardBreakupId Specified"
+            })
+        }
+
+    } catch (error) {
+        res.send({
+            message: "Error",
+            error
+        })
+    }
+})
+
 // Ram: This API is required outside of SaaS app.
 // Todo: this requires updation every time there is a change in /login authenticaiton logic
 router.post("/cServerAuth", async (req, res) => {
