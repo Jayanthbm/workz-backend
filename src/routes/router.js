@@ -992,6 +992,7 @@ router.post("/breakup/:timecard", auth, async (req, res) => {
             let rr = [];
             for (let i = 0; i < tB.length; i++) {
                 let r = {
+                    timecardId: timecardId,
                     timecardBreakupId: tB[i].timecardBreakupId,
                     timeCardBreakup: tB[i].timeCardBreakup,
                     userId: tB[i].userId,
