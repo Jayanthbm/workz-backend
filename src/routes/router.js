@@ -38,9 +38,7 @@ async function getManagerName(userId) {
         }
 
         return m[0];
-    } catch (e) {
-        console.log(e); //TODO Remove During Production
-    }
+    } catch (e) { }
 }
 
 //Company Info
@@ -69,9 +67,7 @@ async function getUserIdfromTeam(teamId) {
                 WHERE teamId =${teamId} AND isManager = 1`;
         let UidR = await db.query(Uid);
         return UidR.results;
-    } catch (e) {
-        console.log(e); //TODO Remove During Production
-    }
+    } catch (e) { }
 }
 
 //Get teams of the User
@@ -83,9 +79,7 @@ async function getTeams(userId) {
             WHERE managerId = ${userId}`;
         let TQR = await db.query(TQ);
         return TQR.results
-    } catch (e) {
-        console.log(e); //TODO Remove During Production
-    }
+    } catch (e) { }
 }
 
 //Get Array Size
@@ -135,9 +129,7 @@ async function generate_dropdown(userId, isManager) {
             }
         }
         return dp;
-    } catch (error) {
-        console.log(error); //TODO Remove During Production
-    }
+    } catch (error) { }
 }
 
 //Function to Create Token
@@ -390,7 +382,7 @@ function getDates(startDate, stopDate) {
 //Routes
 //TODO remove route during production
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
     res.send({
         message: "Hello world"
     })
@@ -421,8 +413,7 @@ router.post("/submitform", async (req, res) => {
 
         } catch (error) {
             res.send({
-                message: "Error Submiting Form",
-                error //TODO Remove During Production
+                message: "Error Submiting Form"
             });
         }
     } else {
@@ -478,8 +469,7 @@ router.post("/login", async (req, res) => {
             bcrypt.compare(password, haspass, async function (err, result) {
                 if (err) {
                     res.send({
-                        message: "Error in Login",
-                        e: err
+                        message: "Error in Login"
                     })
                 }
                 if (result) {
@@ -527,7 +517,6 @@ router.post("/login", async (req, res) => {
     } catch (error) {
         res.send({
             message: "Error in Login",
-            message: error //TODO Remove during Production
         })
     }
 })
@@ -535,7 +524,6 @@ router.post("/login", async (req, res) => {
 //Logout Route to clear Cookies
 
 router.post("/logout", async (req, res) => {
-    console.log(req);
     res.clearCookie('CloudFront-Key-Pair-Id', {
         domain: 'localhost',
         path: '/',
@@ -601,7 +589,6 @@ router.post("/forgotpass", async (req, res) => {
             } catch (error) {
                 res.send({
                     message: "Error Sending Email",
-                    error //TODO Remove During Production
                 })
             }
         }
@@ -626,8 +613,7 @@ router.post("/updatepass", auth, async (req, res) => {
     bcrypt.compare(password, oldPass, function (err, result) {
         if (err) {
             res.send({
-                message: "Error",
-                e: err
+                message: "Error"
             });
         }
         if (result === true) {
@@ -638,8 +624,7 @@ router.post("/updatepass", auth, async (req, res) => {
             bcrypt.hash(password, 10, async function (err, hash) {
                 if (err) {
                     res.send({
-                        message: "Error",
-                        e: err
+                        message: "Error"
                     });
                 }
                 if (hash) {
@@ -656,7 +641,6 @@ router.post("/updatepass", auth, async (req, res) => {
                     } catch (error) {
                         res.send({
                             message: "Error Updating Password",
-                            error //TODO Remove During Production
                         });
                     }
                 }
@@ -810,7 +794,6 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
     } catch (error) {
         res.send({
             message: "Error",
-            e: error //TODO Remove During Production
         })
     }
 })
@@ -960,7 +943,6 @@ router.post("/deepdive/", auth, async (req, res) => {
     } catch (e) {
         res.send({
             message: "Error",
-            e //TODO Remove During Production
         })
     }
 })
@@ -1023,7 +1005,6 @@ router.post("/breakup/:timecard", auth, async (req, res) => {
     } catch (error) {
         res.send({
             message: Error,
-            error //TODO Remove During Production
         })
     }
 })
@@ -1164,7 +1145,6 @@ router.post("/details", auth, async (req, res) => {
     } catch (error) {
         res.send({
             message: "Error",
-            error //TODO Remove During Production
         })
     }
 })
@@ -1201,7 +1181,6 @@ router.post("/flag/:timecard", auth, async (req, res) => {
     } catch (error) {
         res.send({
             message: "Error",
-            e: error //TODO Remove During Production
         })
     }
 })
@@ -1260,7 +1239,6 @@ router.post("/comment/:id", auth, async (req, res) => {
     } catch (error) {
         res.send({
             message: "Error",
-            error //TODO Remove During Production
         })
     }
 })
@@ -1290,8 +1268,7 @@ router.get("/comment/:id", auth, async (req, res) => {
 
     } catch (error) {
         res.send({
-            message: "Error",
-            error //TODO Remove During Production
+            message: "Error"
         })
     }
 })
@@ -1343,7 +1320,7 @@ router.post("/cServerAuth", async (req, res) => {
     } catch (error) {
         res.send({
             "auth": 0,
-            message: error //TODO Remove During Production
+            message: error
         });
     }
 });
