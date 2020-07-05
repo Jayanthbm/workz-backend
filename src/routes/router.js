@@ -13,6 +13,9 @@ const auth = require('../middlewares/auth');
 //AWS
 const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
 
+//constants
+
+const domain = 'localhost';
 //Functions
 
 //Get Name from UserId
@@ -515,19 +518,19 @@ router.post("/login", async (req, res) => {
                     let dp = await generate_dropdown(id, isManager);
                     if (dp) {
                         res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
-                            domain: 'localhost',
+                            domain,
                             path: '/',
                             httpOnly: true,
                         });
 
                         res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
-                            domain: 'localhost',
+                            domain,
                             path: '/',
                             httpOnly: true,
                         });
 
                         res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
-                            domain: 'localhost',
+                            domain,
                             path: '/',
                             httpOnly: true,
                         });
@@ -559,21 +562,32 @@ router.post("/login", async (req, res) => {
     }
 })
 
+//Validate User Token
+
+router.post("/validate", async (req, res) => {
+    let r = await validate_token(req.body.token);
+
+    if (r) {
+        res.send({
+            message: r
+        })
+    }
+})
 //Logout Route to clear Cookies
 
 router.post("/logout", async (req, res) => {
     res.clearCookie('CloudFront-Key-Pair-Id', {
-        domain: 'localhost',
+        domain,
         path: '/',
         httpOnly: true,
     });
     res.clearCookie('CloudFront-Policy', {
-        domain: 'localhost',
+        domain,
         path: '/',
         httpOnly: true,
     });
     res.clearCookie('CloudFront-Signature', {
-        domain: 'localhost',
+        domain,
         path: '/',
         httpOnly: true,
     });
@@ -768,18 +782,6 @@ router.get("/teams/:teamid", auth, async (req, res) => {
     })
 })
 
-//Validate User Token
-
-router.post("/validate", async (req, res) => {
-    let r = await validate_token(req.body.token);
-
-    if (r) {
-        res.send({
-            message: r
-        })
-    }
-})
-
 //Deepdive DropDown
 
 router.post('/deepdivedropdown', auth, async (req, res) => {
@@ -849,115 +851,109 @@ router.post("/deepdive/", auth, async (req, res) => {
                 })
             }
         }
-        let companyId = req.body.companyId;
-        if (companyId) {
-            let companyInfo = await getCompanyInfo(companyId);
-            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 0) {
-                res.send({
-                    message: "Both Webcam and Screenshot disabled "
-                })
+        let companyId = userInfo.companyId;
+        let companyInfo = await getCompanyInfo(companyId);
+        if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 0) {
+            res.send({
+                message: "Both Webcam and Screenshot disabled "
+            })
+        }
+        if (userId) {
+            let date;
+            if (req.body.date) {
+                date = new Date(req.body.date);
+            } else {
+                date = new Date();
             }
-            if (userId) {
-                let date;
-                if (req.body.date) {
-                    date = new Date(req.body.date);
-                } else {
-                    date = new Date();
-                }
-                var dateArray = getDates(startOfWeek(date), endOfWeek(date));
-                let rr = [];
-                let dailysummary = []
-                async function query(date, userId) {
-                    let r1 = []
-                    const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
-                    let dqr = await db.query(dq);
-                    if (dqr.results.length > 0) {
-                        let deepdive = dqr.results;
-                        let Ds = await DailySummary(userId, date);
-                        dailysummary.push({
-                            date: date,
-                            hoursLogged: Ds.hoursLogged,
-                            focusScore: Ds.focusScore,
-                            intensityScore: Ds.intensityScore,
-                            alignmentScore: Ds.alignmentScore,
-                        })
-                        for (let i = 0; i < deepdive.length; i++) {
-                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
-                                let r = {
-                                    timecardId: deepdive[i].timecardId,
-                                    tday: deepdive[i].tday,
-                                    hour: deepdive[i].hour,
-                                    time: deepdive[i].time,
-                                    timecard: deepdive[i].timecard,
-                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
-                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
-                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
-                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
-                                    status: deepdive[i].status,
-                                }
-                                r1.push(r);
+            var dateArray = getDates(startOfWeek(date), endOfWeek(date));
+            let rr = [];
+            let dailysummary = []
+            async function query(date, userId) {
+                let r1 = []
+                const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
+                let dqr = await db.query(dq);
+                if (dqr.results.length > 0) {
+                    let deepdive = dqr.results;
+                    let Ds = await DailySummary(userId, date);
+                    dailysummary.push({
+                        date: date,
+                        hoursLogged: Ds.hoursLogged,
+                        focusScore: Ds.focusScore,
+                        intensityScore: Ds.intensityScore,
+                        alignmentScore: Ds.alignmentScore,
+                    })
+                    for (let i = 0; i < deepdive.length; i++) {
+                        if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
+                            let r = {
+                                timecardId: deepdive[i].timecardId,
+                                tday: deepdive[i].tday,
+                                hour: deepdive[i].hour,
+                                time: deepdive[i].time,
+                                timecard: deepdive[i].timecard,
+                                screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                status: deepdive[i].status,
                             }
-                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 0) {
-                                let r = {
-                                    timecardId: deepdive[i].timecardId,
-                                    tday: deepdive[i].tday,
-                                    hour: deepdive[i].hour,
-                                    time: deepdive[i].time,
-                                    timecard: deepdive[i].timecard,
-                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
-                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
-                                    status: deepdive[i].status,
-                                }
-                                r1.push(r);
-                            }
-                            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 1) {
-                                let r = {
-                                    timecardId: deepdive[i].timecardId,
-                                    tday: deepdive[i].tday,
-                                    hour: deepdive[i].hour,
-                                    time: deepdive[i].time,
-                                    timecard: deepdive[i].timecard,
-                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
-                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
-                                    status: deepdive[i].status,
-                                }
-                                r1.push(r);
-                            }
+                            r1.push(r);
                         }
-                        let a = groupBy(r1, 'hour');
-                        rr.push(a);
+                        if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 0) {
+                            let r = {
+                                timecardId: deepdive[i].timecardId,
+                                tday: deepdive[i].tday,
+                                hour: deepdive[i].hour,
+                                time: deepdive[i].time,
+                                timecard: deepdive[i].timecard,
+                                webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                status: deepdive[i].status,
+                            }
+                            r1.push(r);
+                        }
+                        if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 1) {
+                            let r = {
+                                timecardId: deepdive[i].timecardId,
+                                tday: deepdive[i].tday,
+                                hour: deepdive[i].hour,
+                                time: deepdive[i].time,
+                                timecard: deepdive[i].timecard,
+                                screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                status: deepdive[i].status,
+                            }
+                            r1.push(r);
+                        }
                     }
+                    let a = groupBy(r1, 'hour');
+                    rr.push(a);
                 }
-                let startDate = dateArray[0];
-                let endDate = dateArray[dateArray.length - 1];
-                for (let d = 0; d < dateArray.length; d++) {
-                    await query(dateArray[d], userId)
-                }
-                let wS = await WeekSummary(userId, startDate);
-                if (rr.length > 0) {
-                    res.send({
-                        startDate,
-                        endDate,
-                        hoursLogged: wS.hoursLogged,
-                        focusScore: wS.focusScore,
-                        intensityScore: wS.focusScore,
-                        alignmentScore: wS.alignmentScore,
-                        dailysummary,
-                        results: rr
-                    })
-                } else {
-                    res.send({
-                        message: "No Results Found"
-                    })
-                }
+            }
+            let startDate = dateArray[0];
+            let endDate = dateArray[dateArray.length - 1];
+            for (let d = 0; d < dateArray.length; d++) {
+                await query(dateArray[d], userId)
+            }
+            let wS = await WeekSummary(userId, startDate);
+            if (rr.length > 0) {
+                res.send({
+                    startDate,
+                    endDate,
+                    hoursLogged: wS.hoursLogged,
+                    focusScore: wS.focusScore,
+                    intensityScore: wS.focusScore,
+                    alignmentScore: wS.alignmentScore,
+                    dailysummary,
+                    results: rr
+                })
             } else {
                 res.send({
-                    message: "Missing UserId"
+                    message: "No Results Found"
                 })
             }
         } else {
             res.send({
-                message: "Missing Company Id"
+                message: "Missing UserId"
             })
         }
     } catch (e) {
