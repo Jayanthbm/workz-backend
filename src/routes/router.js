@@ -379,6 +379,44 @@ function getDates(startDate, stopDate) {
     }
     return dateArray;
 }
+function focusSetter(focus, timecardbreakupsize, timecardsize) {
+    if (focus * timecardbreakupsize >= timecardsize) {
+        return 1
+    } else {
+        return 0;
+    }
+}
+function formatTime(timeString) {
+    let t = timeString[0] + timeString[1];
+    if (t === '12') {
+        return `${timeString} PM`;
+    }
+    if (t < 12) {
+        return `${timeString} AM`;
+    }
+    if (t > 12) {
+        t1 = t - 12;
+        return `0${t1}:${timeString[3]}${timeString[4]} PM`;
+    }
+
+    return timeString;
+}
+function DT(date) {
+    let nd = toISOLocal(date).split('T');
+    let d = nd[0];
+    let t = nd[1].slice(0, -13);
+    let nt = formatTime(t)
+    return `${d} ${nt}`;
+}
+async function WeekSummary(userId, startDate) {
+    const sql = `SELECT wsId,weekNum,hoursLogged, hoursFlagged,hoursRejected,FTAR,metricsCount,focusScore, intensityScore, alignmentScore,updated FROM weeklySummary WHERE userId = ${userId} AND weekStart ='${startDate}'`;
+    return (await db.query(sql)).results[0];
+}
+
+async function DailySummary(userId, Date) {
+    const sql = `SELECT dsId,dayName,hoursLogged,hoursFlagged,hoursRejected,FTAR,metricsCount,focusScore,intensityScore,alignmentScore,updated FROM dailySummary WHERE userId = ${userId} AND summaryDate = '${Date}'`;
+    return (await db.query(sql)).results[0];
+}
 //Routes
 //TODO remove route during production
 
@@ -828,19 +866,22 @@ router.post("/deepdive/", auth, async (req, res) => {
                 }
                 var dateArray = getDates(startOfWeek(date), endOfWeek(date));
                 let rr = [];
-                let totaltimecards = 0;
-                let totalIntensity = 0;
-                let totalFocus = 0;
+                let dailysummary = []
                 async function query(date, userId) {
                     let r1 = []
                     const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
                     let dqr = await db.query(dq);
                     if (dqr.results.length > 0) {
                         let deepdive = dqr.results;
+                        let Ds = await DailySummary(userId, date);
+                        dailysummary.push({
+                            date: date,
+                            hoursLogged: Ds.hoursLogged,
+                            focusScore: Ds.focusScore,
+                            intensityScore: Ds.intensityScore,
+                            alignmentScore: Ds.alignmentScore,
+                        })
                         for (let i = 0; i < deepdive.length; i++) {
-                            totaltimecards = totaltimecards + 1;
-                            totalIntensity = totalIntensity + deepdive[i].intensityScore;
-                            totalFocus = totalFocus + deepdive[i].focus;
                             if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
                                 let r = {
                                     timecardId: deepdive[i].timecardId,
@@ -848,19 +889,11 @@ router.post("/deepdive/", auth, async (req, res) => {
                                     hour: deepdive[i].hour,
                                     time: deepdive[i].time,
                                     timecard: deepdive[i].timecard,
-                                    clientId: deepdive[i].clientId,
-                                    keyCounter: deepdive[i].keyCounter,
-                                    mouseCounter: deepdive[i].mouseCounter,
-                                    appName: deepdive[i].appName,
-                                    windowName: deepdive[i].windowName,
-                                    windowUrl: deepdive[i].windowUrl,
                                     screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
                                     screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
                                     webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
                                     webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
                                     status: deepdive[i].status,
-                                    focus: deepdive[i].focus,
-                                    intensityScore: deepdive[i].intensityScore
                                 }
                                 r1.push(r);
                             }
@@ -871,17 +904,9 @@ router.post("/deepdive/", auth, async (req, res) => {
                                     hour: deepdive[i].hour,
                                     time: deepdive[i].time,
                                     timecard: deepdive[i].timecard,
-                                    clientId: deepdive[i].clientId,
-                                    keyCounter: deepdive[i].keyCounter,
-                                    mouseCounter: deepdive[i].mouseCounter,
-                                    appName: deepdive[i].appName,
-                                    windowName: deepdive[i].windowName,
-                                    windowUrl: deepdive[i].windowUrl,
                                     webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
                                     webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
                                     status: deepdive[i].status,
-                                    focus: deepdive[i].focus,
-                                    intensityScore: deepdive[i].intensityScore
                                 }
                                 r1.push(r);
                             }
@@ -892,23 +917,15 @@ router.post("/deepdive/", auth, async (req, res) => {
                                     hour: deepdive[i].hour,
                                     time: deepdive[i].time,
                                     timecard: deepdive[i].timecard,
-                                    clientId: deepdive[i].clientId,
-                                    keyCounter: deepdive[i].keyCounter,
-                                    mouseCounter: deepdive[i].mouseCounter,
-                                    appName: deepdive[i].appName,
-                                    windowName: deepdive[i].windowName,
-                                    windowUrl: deepdive[i].windowUrl,
                                     screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
                                     screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
                                     status: deepdive[i].status,
-                                    focus: deepdive[i].focus,
-                                    intensityScore: deepdive[i].intensityScore
                                 }
                                 r1.push(r);
                             }
                         }
                         let a = groupBy(r1, 'hour');
-                        rr.push(a)
+                        rr.push(a);
                     }
                 }
                 let startDate = dateArray[0];
@@ -916,13 +933,16 @@ router.post("/deepdive/", auth, async (req, res) => {
                 for (let d = 0; d < dateArray.length; d++) {
                     await query(dateArray[d], userId)
                 }
+                let wS = await WeekSummary(userId, startDate);
                 if (rr.length > 0) {
                     res.send({
                         startDate,
                         endDate,
-                        totalMinutes: totaltimecards * companyInfo.timecardsize,
-                        AverageIntensity: totalIntensity / totaltimecards,
-                        AverageFocus: totalFocus / totaltimecards,
+                        hoursLogged: wS.hoursLogged,
+                        focusScore: wS.focusScore,
+                        intensityScore: wS.focusScore,
+                        alignmentScore: wS.alignmentScore,
+                        dailysummary,
                         results: rr
                     })
                 } else {
@@ -965,15 +985,13 @@ router.post("/breakup/:timecard", auth, async (req, res) => {
             let timecardDay = tQR.results[0].timecardDay;
             let timecardHour = tQR.results[0].timecardHour;
             let timecardMinute = tQR.results[0].timecardMinute;
-            let timecard = tQR.results[0].timecard;
             let userId = tQR.results[0].userId;
             let focus = tQR.results[0].focus;
             let intensityScore = tQR.results[0].intensityScore;
-
             //Querying from Timecard Breakup table
 
             const tBQ = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,screenshotUrl,webcamUrl,managerComment,commentShared 
-            FROM timecardBreakup WHERE userId = ${userId} AND YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND MINUTE(timeCardBreakup) BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize}`;
+            FROM timecardBreakup WHERE userId = ${userId} AND YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND MINUTE(timeCardBreakup) BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize} ORDER BY timeCardBreakup ASC`;
             let tBQR = await db.query(tBQ);
             let tB = tBQR.results;
             let rr = [];
@@ -981,19 +999,15 @@ router.post("/breakup/:timecard", auth, async (req, res) => {
                 let r = {
                     timecardId: timecardId,
                     timecardBreakupId: tB[i].timecardBreakupId,
-                    timeCardBreakup: tB[i].timeCardBreakup,
-                    userId: tB[i].userId,
-                    clientId: tB[i].clientId,
+                    Datetime: DT(tB[i].timeCardBreakup),
                     screenshotUrl: `${CC.CDN_URL}/${userInfo.companyId}/${userId}/sslib/${tB[i].screenshotUrl}`,
                     webcamUrl: `${CC.CDN_URL}/${userInfo.companyId}/${userId}/wclib/${tB[i].webcamUrl}`,
                     managerComment: tB[i].managerComment,
-                    commentShared: tB[i].commentShared,
                 }
                 rr.push(r)
             }
             res.send({
-                timecard,
-                focus,
+                focus: focusSetter(focus, comapanyInfo.timecardbreakupsize, comapanyInfo.timecardsize),
                 intensityScore,
                 results: rr
             })
@@ -1041,7 +1055,7 @@ router.post("/details", auth, async (req, res) => {
                 let rr = [];
                 async function query(date, userId) {
                     let r1 = []
-                    const dq = `SELECT DAYNAME(timeCardBreakup)as tday,HOUR(timeCardBreakup) as hour,TIME(timeCardBreakup) as time,timecardBreakupId,timecardId,timeCardBreakup,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,managerComment,commentShared FROM  timecardBreakup WHERE userId=${userId} AND DATE(timeCardBreakup) = '${date}'`;
+                    const dq = `SELECT DAYNAME(timeCardBreakup)as tday,HOUR(timeCardBreakup) as hour,TIME(timeCardBreakup) as time,timecardBreakupId,timecardId,timeCardBreakup,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,managerComment,commentShared FROM  timecardBreakup WHERE userId=${userId} AND DATE(timeCardBreakup) = '${date}' ORDER BY time`;
                     let dqr = await db.query(dq);
                     if (dqr.results.length > 0) {
                         let deepdive = dqr.results;
@@ -1054,12 +1068,6 @@ router.post("/details", auth, async (req, res) => {
                                     hour: deepdive[i].hour,
                                     time: deepdive[i].time,
                                     timeCardBreakup: deepdive[i].timeCardBreakup,
-                                    clientId: deepdive[i].clientId,
-                                    keyCounter: deepdive[i].keyCounter,
-                                    mouseCounter: deepdive[i].mouseCounter,
-                                    appName: deepdive[i].appName,
-                                    windowName: deepdive[i].windowName,
-                                    windowUrl: deepdive[i].windowUrl,
                                     screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
                                     screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
                                     webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
@@ -1077,12 +1085,6 @@ router.post("/details", auth, async (req, res) => {
                                     hour: deepdive[i].hour,
                                     time: deepdive[i].time,
                                     timeCardBreakup: deepdive[i].timeCardBreakup,
-                                    clientId: deepdive[i].clientId,
-                                    keyCounter: deepdive[i].keyCounter,
-                                    mouseCounter: deepdive[i].mouseCounter,
-                                    appName: deepdive[i].appName,
-                                    windowName: deepdive[i].windowName,
-                                    windowUrl: deepdive[i].windowUrl,
                                     webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
                                     webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
                                     managerComment: deepdive[i].managerComment,
@@ -1098,12 +1100,6 @@ router.post("/details", auth, async (req, res) => {
                                     hour: deepdive[i].hour,
                                     time: deepdive[i].time,
                                     timeCardBreakup: deepdive[i].timeCardBreakup,
-                                    clientId: deepdive[i].clientId,
-                                    keyCounter: deepdive[i].keyCounter,
-                                    mouseCounter: deepdive[i].mouseCounter,
-                                    appName: deepdive[i].appName,
-                                    windowName: deepdive[i].windowName,
-                                    windowUrl: deepdive[i].windowUrl,
                                     screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
                                     screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
                                     managerComment: deepdive[i].managerComment,
