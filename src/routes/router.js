@@ -910,6 +910,8 @@ router.post("/deepdive/", auth, async (req, res) => {
                                 webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
                                 webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
                                 status: deepdive[i].status,
+                                focus: deepdive[i].focus,
+                                intensityScore: deepdive[i].intensityScore,
                             }
                             r1.push(r);
                         }
@@ -923,6 +925,8 @@ router.post("/deepdive/", auth, async (req, res) => {
                                 screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
                                 screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
                                 status: deepdive[i].status,
+                                focus: deepdive[i].focus,
+                                intensityScore: deepdive[i].intensityScore,
                             }
                             r1.push(r);
                         }
