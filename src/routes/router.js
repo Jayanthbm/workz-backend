@@ -1039,6 +1039,8 @@ router.post("/zoom", auth, async (req, res) => {
     try {
         let timecardId = req.body.timecardId;
         let timecardBreakupId = req.body.timecardBreakupId;
+        let startDate = req.body.startDate;
+        let endDate = req.body.endDate;
         if (timecardId && timecardBreakupId) {
             res.send({
                 message: 'Send Either timecardId or timecardBreakupId'
@@ -1048,8 +1050,6 @@ router.post("/zoom", auth, async (req, res) => {
             if (timecardBreakupId) {
                 timecardId = await getTimecardId(timecardBreakupId);
             }
-            let startDate = req.body.startDate;
-            let endDate = req.body.endDate;
             if (startDate && endDate) {
                 let userInfo = await getUserInfo(req.userId);
                 let comapanyInfo = await getCompanyInfo(userInfo.companyId);
