@@ -420,6 +420,70 @@ async function DailySummary(userId, Date) {
     const sql = `SELECT dsId,dayName,hoursLogged,hoursFlagged,hoursRejected,FTAR,metricsCount,focusScore,intensityScore,alignmentScore,updated FROM dailySummary WHERE userId = ${userId} AND summaryDate = '${Date}'`;
     return (await db.query(sql)).results[0];
 }
+function prevnext(array, timecardId) {
+    let index = 0;
+    let pTiD = 0;
+    let nTiD = 0;
+    for (let i = 0; i < array.length; i++) {
+        if (array[i].timecardId == timecardId) {
+            index = i;
+        }
+    }
+    if (index === 0) {
+        pTiD = array[array.length - 1].timecardId;
+        nTiD = array[index + 1].timecardId;
+    } else {
+        if (index === array.length - 1) {
+            pTiD = array[index - 1].timecardId;
+            nTiD = array[0].timecardId;
+        } else {
+            pTiD = array[index - 1].timecardId;
+            nTiD = array[index + 1].timecardId;
+        }
+    }
+    return {
+        pTiD,
+        nTiD
+    }
+}
+
+async function getTimecardId(timecardBreakupId) {
+    const tbQ = `SELECT userId,YEAR(timeCardBreakup) as year, MONTH(timeCardBreakup) as month, DAY(timeCardBreakup) as day, HOUR(timeCardBreakup) as hour,MINUTE(timeCardBreakup) as minute FROM timecardBreakup WHERE timecardBreakupId = ${timecardBreakupId}`;
+    let tbQR = await db.query(tbQ);
+    let userId = tbQR.results[0].userId;
+    let year = tbQR.results[0].year;
+    let month = tbQR.results[0].month;
+    let day = tbQR.results[0].day;
+    let hour = tbQR.results[0].hour;
+    let minute = tbQR.results[0].minute;
+    if (minute >= 0 && minute < 10) {
+        minute = 0
+    }
+    if (minute >= 10 && minute < 20) {
+        minute = 10
+    }
+    if (minute >= 20 && minute < 30) {
+        minute = 20
+    }
+    if (minute >= 30 && minute < 40) {
+        minute = 30
+    }
+    if (minute >= 40 && minute < 50) {
+        minute = 40
+    }
+    if (minute >= 50 && minute < 60) {
+        minute = 50
+    }
+
+    const tQ = `SELECT timecardId
+                FROM timecard
+                WHERE userId = ${userId} AND YEAR(timecard) = ${year} AND MONTH(timecard) = ${month}  AND DAY(timecard) = ${day} AND HOUR(timecard) = ${hour} AND MINUTE(timecard) = ${minute}`;
+    const tQR = await db.query(tQ);
+    if (tQR) {
+        return tQR.results[0].timecardId;
+    }
+
+}
 //Routes
 //TODO remove route during production
 
@@ -870,7 +934,7 @@ router.post("/deepdive/", auth, async (req, res) => {
             let dailysummary = []
             async function query(date, userId) {
                 let r1 = []
-                const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}'`;
+                const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}' ORDER BY timecard ASC`;
                 let dqr = await db.query(dq);
                 if (dqr.results.length > 0) {
                     let deepdive = dqr.results;
@@ -971,51 +1035,77 @@ router.post("/deepdive/", auth, async (req, res) => {
 
 //Timecard Breakup data from timecardId
 
-router.post("/breakup/:timecard", auth, async (req, res) => {
+router.post("/zoom", auth, async (req, res) => {
     try {
-        let timecardId = req.params.timecard;
-        let userInfo = await getUserInfo(req.userId);
-        let comapanyInfo = await getCompanyInfo(userInfo.companyId);
-        if (timecardId) {
-            //Get all timecard data
-            const tQ = `SELECT YEAR(timecard) as timecardYear,MONTH(timecard) as timecardMonth,DAY(timecard)as timecardDay,HOUR(timecard) as timecardHour,MINUTE(timecard) as timecardMinute,timecard,userId,focus,intensityScore
+        let timecardId = req.body.timecardId;
+        let timecardBreakupId = req.body.timecardBreakupId;
+        if (timecardId && timecardBreakupId) {
+            res.send({
+                message: 'Send Either timecardId or timecardBreakupId'
+            })
+        }
+        if (timecardId || timecardBreakupId) {
+            if (timecardBreakupId) {
+                timecardId = await getTimecardId(timecardBreakupId);
+            }
+            let startDate = req.body.startDate;
+            let endDate = req.body.endDate;
+            if (startDate && endDate) {
+                let userInfo = await getUserInfo(req.userId);
+                let comapanyInfo = await getCompanyInfo(userInfo.companyId);
+                //Get all timecard data
+                const tQ = `SELECT YEAR(timecard) as timecardYear,MONTH(timecard) as timecardMonth,DAY(timecard)as timecardDay,HOUR(timecard) as timecardHour,MINUTE(timecard) as timecardMinute,timecard,userId,focus,intensityScore
             FROM timecard 
             WHERE timecardId = ${timecardId}`;
-            let tQR = await db.query(tQ);
-            let timecardYear = tQR.results[0].timecardYear;
-            let timecardMonth = tQR.results[0].timecardMonth;
-            let timecardDay = tQR.results[0].timecardDay;
-            let timecardHour = tQR.results[0].timecardHour;
-            let timecardMinute = tQR.results[0].timecardMinute;
-            let userId = tQR.results[0].userId;
-            let focus = tQR.results[0].focus;
-            let intensityScore = tQR.results[0].intensityScore;
-            //Querying from Timecard Breakup table
+                let tQR = await db.query(tQ);
+                let timecardYear = tQR.results[0].timecardYear;
+                let timecardMonth = tQR.results[0].timecardMonth;
+                let timecardDay = tQR.results[0].timecardDay;
+                let timecardHour = tQR.results[0].timecardHour;
+                let timecardMinute = tQR.results[0].timecardMinute;
+                let userId = tQR.results[0].userId;
+                let focus = tQR.results[0].focus;
+                let intensityScore = tQR.results[0].intensityScore;
+                //Querying from Timecard Breakup table
 
-            const tBQ = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,screenshotUrl,webcamUrl,managerComment,commentShared 
-            FROM timecardBreakup WHERE userId = ${userId} AND YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND MINUTE(timeCardBreakup) BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize} ORDER BY timeCardBreakup ASC`;
-            let tBQR = await db.query(tBQ);
-            let tB = tBQR.results;
-            let rr = [];
-            for (let i = 0; i < tB.length; i++) {
-                let r = {
-                    timecardId: timecardId,
-                    timecardBreakupId: tB[i].timecardBreakupId,
-                    Datetime: DT(tB[i].timeCardBreakup),
-                    screenshotUrl: `${CC.CDN_URL}/${userInfo.companyId}/${userId}/sslib/${tB[i].screenshotUrl}`,
-                    webcamUrl: `${CC.CDN_URL}/${userInfo.companyId}/${userId}/wclib/${tB[i].webcamUrl}`,
-                    managerComment: tB[i].managerComment,
+                const tBQ = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,screenshotUrl,webcamUrl,managerComment,commentShared 
+            FROM timecardBreakup WHERE userId = ${userId} AND YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND MINUTE(timeCardBreakup) BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize - 1} ORDER BY timeCardBreakup ASC`;
+                let tBQR = await db.query(tBQ);
+                let tB = tBQR.results;
+                let rr = [];
+                for (let i = 0; i < tB.length; i++) {
+                    let r = {
+                        timecardId: timecardId,
+                        timecardBreakupId: tB[i].timecardBreakupId,
+                        Datetime: DT(tB[i].timeCardBreakup),
+                        screenshotUrl: `${CC.CDN_URL}/${userInfo.companyId}/${userId}/sslib/${tB[i].screenshotUrl}`,
+                        webcamUrl: `${CC.CDN_URL}/${userInfo.companyId}/${userId}/wclib/${tB[i].webcamUrl}`,
+                        managerComment: tB[i].managerComment,
+                    }
+                    rr.push(r)
                 }
-                rr.push(r)
+                //Query to find Next and Previous timecards
+                const pnq = `SELECT timecardId,timecard
+                        FROM timecard
+                        WHERE userId =${userId} AND DATE(timecard) BETWEEN '${startDate}' AND '${endDate}'
+                        ORDER BY timecard  ASC`;
+                let pnqR = await db.query(pnq);
+                let PN = prevnext(pnqR.results, timecardId);
+                res.send({
+                    focus: focusSetter(focus, comapanyInfo.timecardbreakupsize, comapanyInfo.timecardsize),
+                    intensityScore,
+                    PreviousTimecard: PN.pTiD,
+                    NextTimeCard: PN.nTiD,
+                    results: rr
+                })
+            } else {
+                res.send({
+                    message: "Missing Start Date and End Date"
+                })
             }
-            res.send({
-                focus: focusSetter(focus, comapanyInfo.timecardbreakupsize, comapanyInfo.timecardsize),
-                intensityScore,
-                results: rr
-            })
         } else {
             res.send({
-                message: "Missing TimecardId"
+                message: "Missing Data- Either Timecard or Timecard Breakup Id required"
             })
         }
     } catch (error) {
