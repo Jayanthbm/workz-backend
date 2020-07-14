@@ -1054,7 +1054,7 @@ router.post("/zoom", auth, async (req, res) => {
                 let userInfo = await getUserInfo(req.userId);
                 let comapanyInfo = await getCompanyInfo(userInfo.companyId);
                 //Get all timecard data
-                const tQ = `SELECT YEAR(timecard) as timecardYear,MONTH(timecard) as timecardMonth,DAY(timecard)as timecardDay,HOUR(timecard) as timecardHour,MINUTE(timecard) as timecardMinute,timecard,userId,focus,intensityScore
+                const tQ = `SELECT YEAR(timecard) as timecardYear,MONTH(timecard) as timecardMonth,DAY(timecard)as timecardDay,HOUR(timecard) as timecardHour,MINUTE(timecard) as timecardMinute,timecard,userId,status,focus,intensityScore
             FROM timecard 
             WHERE timecardId = ${timecardId}`;
                 let tQR = await db.query(tQ);
@@ -1064,6 +1064,7 @@ router.post("/zoom", auth, async (req, res) => {
                 let timecardHour = tQR.results[0].timecardHour;
                 let timecardMinute = tQR.results[0].timecardMinute;
                 let userId = tQR.results[0].userId;
+                let status = tQR.results[0].status;
                 let focus = tQR.results[0].focus;
                 let intensityScore = tQR.results[0].intensityScore;
                 //Querying from Timecard Breakup table
@@ -1092,11 +1093,12 @@ router.post("/zoom", auth, async (req, res) => {
                 let pnqR = await db.query(pnq);
                 let PN = prevnext(pnqR.results, timecardId);
                 res.send({
+                    status,
                     focus: focusSetter(focus, comapanyInfo.timecardbreakupsize, comapanyInfo.timecardsize),
                     intensityScore,
                     PreviousTimecard: PN.pTiD,
                     NextTimeCard: PN.nTiD,
-                    results: rr
+                    results: rr,
                 })
             } else {
                 res.send({
