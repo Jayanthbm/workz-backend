@@ -424,22 +424,27 @@ function prevnext(array, timecardId) {
     let index = 0;
     let pTiD = 0;
     let nTiD = 0;
-    for (let i = 0; i < array.length; i++) {
-        if (array[i].timecardId == timecardId) {
-            index = i;
+    if (array.length > 1) {
+        for (let i = 0; i < array.length; i++) {
+            if (array[i].timecardId == timecardId) {
+                index = i;
+            }
         }
-    }
-    if (index === 0) {
-        pTiD = array[array.length - 1].timecardId;
-        nTiD = array[index + 1].timecardId;
-    } else {
-        if (index === array.length - 1) {
-            pTiD = array[index - 1].timecardId;
-            nTiD = array[0].timecardId;
-        } else {
-            pTiD = array[index - 1].timecardId;
+        if (index === 0) {
+            pTiD = array[array.length - 1].timecardId;
             nTiD = array[index + 1].timecardId;
+        } else {
+            if (index === array.length - 1) {
+                pTiD = array[index - 1].timecardId;
+                nTiD = array[0].timecardId;
+            } else {
+                pTiD = array[index - 1].timecardId;
+                nTiD = array[index + 1].timecardId;
+            }
         }
+    } else {
+        pTiD = timecardId;
+        nTiD = timecardId;
     }
     return {
         pTiD,
@@ -1089,9 +1094,9 @@ router.post("/zoom", auth, async (req, res) => {
                 }
                 //Query to find Next and Previous timecards
                 const pnq = `SELECT timecardId,timecard
-                        FROM timecard
-                        WHERE userId =${userId} AND DATE(timecard) BETWEEN '${startDate}' AND '${endDate}'
-                        ORDER BY timecard  ASC`;
+                            FROM timecard
+                            WHERE userId =${userId} AND DATE(timecard) BETWEEN '${startDate}' AND '${endDate}'
+                            ORDER BY timecard  ASC`;
                 let pnqR = await db.query(pnq);
                 let PN = prevnext(pnqR.results, timecardId);
                 res.send({
