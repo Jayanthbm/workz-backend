@@ -939,13 +939,15 @@ router.post("/deepdive/", auth, async (req, res) => {
                 if (dqr.results.length > 0) {
                     let deepdive = dqr.results;
                     let Ds = await DailySummary(userId, date);
-                    dailysummary.push({
-                        date: date,
-                        hoursLogged: Ds.hoursLogged,
-                        focusScore: Ds.focusScore,
-                        intensityScore: Ds.intensityScore,
-                        alignmentScore: Ds.alignmentScore,
-                    })
+                    if (Ds) {
+                        dailysummary.push({
+                            date: date,
+                            hoursLogged: Ds.hoursLogged,
+                            focusScore: Ds.focusScore,
+                            intensityScore: Ds.intensityScore,
+                            alignmentScore: Ds.alignmentScore,
+                        })
+                    }
                     for (let i = 0; i < deepdive.length; i++) {
                         if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
                             let r = {
@@ -1009,10 +1011,10 @@ router.post("/deepdive/", auth, async (req, res) => {
                 res.send({
                     startDate,
                     endDate,
-                    hoursLogged: wS.hoursLogged,
-                    focusScore: wS.focusScore,
-                    intensityScore: wS.focusScore,
-                    alignmentScore: wS.alignmentScore,
+                    hoursLogged: wS ? wS.hoursLogged : null,
+                    focusScore: wS ? wS.focusScore : null,
+                    intensityScore: wS ? wS.focusScore : null,
+                    alignmentScore: wS ? wS.alignmentScore : null,
                     dailysummary,
                     results: rr
                 })
@@ -1029,7 +1031,6 @@ router.post("/deepdive/", auth, async (req, res) => {
     } catch (e) {
         res.send({
             message: "Error",
-            e,
         })
     }
 })
