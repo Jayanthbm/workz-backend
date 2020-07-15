@@ -1029,6 +1029,7 @@ router.post("/deepdive/", auth, async (req, res) => {
     } catch (e) {
         res.send({
             message: "Error",
+            e,
         })
     }
 })
