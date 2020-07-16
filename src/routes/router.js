@@ -338,8 +338,8 @@ function endOfWeek(date) {
 function groupBy(arr, key) {
     return (arr || []).reduce((acc, x = {}) => ({
         ...acc,
-        [x[key]]: [...acc[x[key]] || [], x]
-    }), {})
+        [x[key]]: [...(acc[x[key]] || []), x]
+    }), {});
 }
 
 //Function to get all Team members based on teamId
@@ -489,366 +489,365 @@ async function getTimecardId(timecardBreakupId) {
     }
 
 }
+
+function responseSender(res, message) {
+    res.send({
+        message: message
+    })
+}
+
+async function checkAccess(authId, isManager, requestedId) {
+    if (isManager === 0) {
+        return authId === requestedId ? true : false;
+    }
+    if (isManager === 1) {
+        //Get all team
+        let access = false;
+        let memberIds = [];
+        memberIds.push(authId);
+        let teams = await get_teams(authId);
+        for (let i = 0; i < teams.length; i++) {
+            let members = await getTeamMembers(teams[i].teamId);
+            for (let j = 0; j < members.length; j++) {
+                memberIds.push(members[j].userId)
+            }
+        }
+        for (let m = 0; m < memberIds.length; m++) {
+            if (memberIds[m] == requestedId) {
+                access = true
+            }
+        }
+        return access;
+    }
+}
 //Routes
 //TODO remove route during production
 
 router.get("/", async (req, res) => {
-    res.send({
-        message: "Hello world"
-    })
+    responseSender(res, `Hello world`)
 })
 
 //Form Submission End point Support and Demo Forms
 
 router.post("/submitform", async (req, res) => {
-    let name = req.body.name;
-    let companyName = req.body.companyName;
-    let phone = req.body.phone;
-    let email = req.body.email;
-    let description = req.body.description;
-    let typeRequest = req.body.typeRequest;
-    if (typeRequest === 'Demo' || typeRequest === 'Support') {
-        const sql = `INSERT INTO queryForms(name,companyName,phone,email,description,typeRequest)VALUES('${name}','${companyName}','${phone}','${email}','${description}','${typeRequest}') `;
-        try {
-            let results = await db.query(sql);
-            if (results.results.affectedRows === 1 && results.results.warningCount === 0) {
-                res.send({
-                    message: "Form Submitted Successfully"
-                })
-            } else {
-                res.send({
-                    message: "Error Submiting Form"
-                });
-            }
-
-        } catch (error) {
-            res.send({
-                message: "Error Submiting Form"
-            });
+    try {
+        let name = req.body.name;
+        let companyName = req.body.companyName;
+        let phone = req.body.phone;
+        let email = req.body.email;
+        let description = req.body.description;
+        let typeRequest = req.body.typeRequest;
+        if (!(typeRequest === 'Demo' || typeRequest === 'Support')) {
+            responseSender(res, `Missing Data`);
+        } else {
+            let fI = `INSERT INTO queryForms(name,companyName,phone,email,description,typeRequest)VALUES('${name}','${companyName}','${phone}','${email}','${description}','${typeRequest}') `;
+            let fIr = await db.query(fI);
+            fIr.results.affectedRows === 1 && fIr.results.warningCount === 0 ? responseSender(res, `Form Submitted Successfully`) : responseSender(res, `Error Submiting Form`);
         }
-    } else {
-        res.send({
-            message: "Error Submiting Form"
-        });
+    } catch (error) {
+        responseSender(res, error);
     }
-
 })
 
 //Login Route
 
 router.post("/login", async (req, res) => {
-    let companyname = req.body.companyname;
-    let username = req.body.username;
-    let password = req.body.password;
-    const sql = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') AND  user.isActive =1 AND company.status='active'`;
     try {
-        let {
-            results
-        } = await db.query(sql);
-        if (Object.keys(results).length === 0) {
-            res.send({
-                message: "Invalid Credentials"
-            });
+        let companyname = req.body.companyname;
+        let username = req.body.username;
+        let password = req.body.password;
+        if (!companyname && !username && !password) {
+            responseSender(res, `Invalid Credentials`);
         } else {
-            let haspass = results[0].password;
-            let id = results[0].userId;
-            let companyId = results[0].companyId;
-            let email = results[0].emailId;
-            let teamId = results[0].teamId;
-            let firstname = results[0].firstname;
-            let profilePic = results[0].profilePic;
-            let profileThumbnailUrl = results[0].profileThumbnailUrl;
-            let isManager = results[0].isManager;
-            let previousPassword = results[0].previousPassword;
-            const policy = JSON.stringify({
-                Statement: [
-                    {
-                        Resource: CC.cfurl + companyId + '/*',
-                        Condition: {
-                            DateLessThan: {
-                                'AWS:EpochTime':
-                                    Math.floor(new Date().getTime() / 1000) + 60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
-                            },
-                        },
-                    },
-                ],
-            });
-            const cookie = cloudFront.getSignedCookie({
-                policy,
-            });
-            bcrypt.compare(password, haspass, async function (err, result) {
-                if (err) {
-                    res.send({
-                        message: "Error in Login"
-                    })
-                }
-                if (result) {
-                    const token = await create_token(id, '3h')
-                    let dp = await generate_dropdown(id, isManager);
-                    if (dp) {
-                        res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
-                            domain,
-                            path: '/',
-                            httpOnly: true,
+            let loginQuery = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') AND  user.isActive =1 AND company.status='active'`;
+            let loginResults = await db.query(loginQuery);
+            let results = loginResults.results
+            if (results.length < 1) {
+                responseSender(res, `Invalid Credentials`);
+            } else {
+                let haspass = results[0].password;
+                let id = results[0].userId;
+                let companyId = results[0].companyId;
+                let email = results[0].emailId;
+                let teamId = results[0].teamId;
+                let firstname = results[0].firstname;
+                let profilePic = results[0].profilePic;
+                let profileThumbnailUrl = results[0].profileThumbnailUrl;
+                let isManager = results[0].isManager;
+                let previousPassword = results[0].previousPassword;
+                bcrypt.compare(password, haspass, async function (err, result) {
+                    if (err) {
+                        responseSender(res, `Error in Login`);
+                    } else {
+                        const policy = JSON.stringify({
+                            Statement: [
+                                {
+                                    Resource: CC.cfurl + companyId + '/*',
+                                    Condition: {
+                                        DateLessThan: {
+                                            'AWS:EpochTime':
+                                                Math.floor(new Date().getTime() / 1000) + 60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
+                                        },
+                                    },
+                                },
+                            ],
                         });
+                        const cookie = cloudFront.getSignedCookie({
+                            policy,
+                        });
+                        const token = await create_token(id, '3h')
+                        let dp = await generate_dropdown(id, isManager);
+                        if (dp) {
+                            res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
+                                domain,
+                                path: '/',
+                                httpOnly: true,
+                            });
 
-                        res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
-                            domain,
-                            path: '/',
-                            httpOnly: true,
-                        });
+                            res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
+                                domain,
+                                path: '/',
+                                httpOnly: true,
+                            });
 
-                        res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
-                            domain,
-                            path: '/',
-                            httpOnly: true,
-                        });
-                        res.send({
-                            token,
-                            companyId,
-                            teamId,
-                            "userId": id,
-                            isManager,
-                            dropdown: dp,
-                            email,
-                            firstname,
-                            profilePic,
-                            profileThumbnailUrl,
-                            previousPassword
-                        })
+                            res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
+                                domain,
+                                path: '/',
+                                httpOnly: true,
+                            });
+                            res.send({
+                                token,
+                                companyId,
+                                teamId,
+                                "userId": id,
+                                isManager,
+                                dropdown: dp,
+                                email,
+                                firstname,
+                                profilePic,
+                                profileThumbnailUrl,
+                                previousPassword
+                            })
+                        }
                     }
-                } else {
-                    res.send({
-                        message: "Invalid Credentials"
-                    });
-                }
-            })
+                })
+
+            }
         }
     } catch (error) {
-        res.send({
-            message: "Error in Login",
-        })
+        responseSender(res, `Invalid Credentials`);
     }
 })
 
 //Validate User Token
 
 router.post("/validate", async (req, res) => {
-    let r = await validate_token(req.body.token);
+    try {
+        let r = await validate_token(req.body.token);
 
-    if (r) {
-        res.send({
-            message: r
-        })
+        if (r) {
+            responseSender(res, r)
+        }
+    } catch (error) {
+        responseSender(res, error)
     }
+
 })
 //Logout Route to clear Cookies
 
 router.post("/logout", async (req, res) => {
-    res.clearCookie('CloudFront-Key-Pair-Id', {
-        domain,
-        path: '/',
-        httpOnly: true,
-    });
-    res.clearCookie('CloudFront-Policy', {
-        domain,
-        path: '/',
-        httpOnly: true,
-    });
-    res.clearCookie('CloudFront-Signature', {
-        domain,
-        path: '/',
-        httpOnly: true,
-    });
-    res.send({
-        message: "Cookie Cleared"
-    })
+    try {
+        res.clearCookie('CloudFront-Key-Pair-Id', {
+            domain,
+            path: '/',
+            httpOnly: true,
+        });
+        res.clearCookie('CloudFront-Policy', {
+            domain,
+            path: '/',
+            httpOnly: true,
+        });
+        res.clearCookie('CloudFront-Signature', {
+            domain,
+            path: '/',
+            httpOnly: true,
+        });
+        responseSender(res, `Cookie Cleared`);
+    } catch (error) {
+        responseSender(res, error)
+    }
+
 })
 
 //Forgot Password Route
 
 router.post("/forgotpass", async (req, res) => {
-    let username = req.body.username;
-    const sql = `SELECT userId,empId,emailId FROM user WHERE empId = '${username}' or emailId= '${username}'`;
-    let userQuery = await db.query(sql);
-    if (userQuery.results.length > 0) {
-        let id = userQuery.results[0].userId;
-        let emailId = userQuery.results[0].emailId;
-        if (id) {
-            const token = await create_token(id, '3h');
-            try {
-                let transporter = nodemailer.createTransport({
-                    service: 'gmail',
-                    auth: {
-                        user: 'jayanth.m1995@gmail.com', // generated ethereal user
-                        pass: 'i@143magge' // generated ethereal password
+    try {
+        let username = req.body.username;
+        if (!username) {
+            responseSender(res, `No User Found`);
+        } else {
+            let userQuery = `SELECT userId,empId,emailId FROM user WHERE empId = '${username}' or emailId= '${username}'`;
+            if (userQuery.results.length < 1) {
+                responseSender(res, `No User Found`);
+            } else {
+                let id = userQuery.results[0].userId;
+                let emailId = userQuery.results[0].emailId;
+                if (id) {
+                    const token = await create_token(id, '3h');
+                    let transporter = nodemailer.createTransport({
+                        service: 'gmail',
+                        auth: {
+                            user: 'jayanth.m1995@gmail.com',
+                            pass: 'i@143magge'
+                        }
+                    });
+                    let info = await transporter.sendMail({
+                        from: 'jayanth.m1995@gmail.com',
+                        to: emailId,
+                        subject: "Password Reset",
+                        html: `<div>
+                                <h1> Update Password</h1>
+                                <span> To Update click the below link and follow the steps
+                                </span><br/>
+                                <span>
+                                <b>Token will expire in 3 hrs</b>
+                                </span><br/>
+                                <a href='${CC.RESETPASSLINK}/${token}'>Click here to Reset</a>
+                                </div>` // html body
+                    });
+                    if (info['accepted'].length > 0) {
+                        responseSender(res, `Email Sent to registered Address`);
+                    } else {
+                        responseSender(res, `Error Sending Email`);
                     }
-                });
-                let info = await transporter.sendMail({
-                    from: 'jayanth.m1995@gmail.com',
-                    to: emailId,
-                    subject: "Password Reset",
-                    html: `<div>
-                <h1> Update Password</h1>
-                <span> To Update click the below link and follow the steps
-                </span><br/>
-                <span>
-                <b>Token will expire in 3 hrs</b>
-                </span><br/>
-                <a href='${CC.RESETPASSLINK}/${token}'>Click here to Reset</a>
-                </div>` // html body
-                });
-                if (info['accepted'].length > 0) {
-                    res.send({
-                        message: "Email Sent to registered Address"
-                    })
-                } else {
-                    res.send({
-                        message: "Error Sending Email"
-                    })
                 }
-            } catch (error) {
-                res.send({
-                    message: "Error Sending Email",
-                })
             }
         }
-    } else {
-        res.send({
-            message: "No User Found"
-        })
+    } catch (error) {
+        responseSender(res, error)
     }
 })
 
 //Update Pass route
 
 router.post("/updatepass", auth, async (req, res) => {
-    let userId = req.userId;
-    let password = req.body.password;
-    let oldPass;
-    const sql = `SELECT password from user where userId =${userId}`;
-    let {
-        results
-    } = await db.query(sql);
-    oldPass = results[0].password;
-    bcrypt.compare(password, oldPass, function (err, result) {
-        if (err) {
-            res.send({
-                message: "Error"
-            });
-        }
-        if (result === true) {
-            res.send({
-                message: "You can't use the Previous Password"
-            })
+    try {
+        let userId = req.userId;
+        let password = req.body.password;
+        let oldPass;
+        if (!userId) {
+            responseSender(res, `No User Found`)
         } else {
-            bcrypt.hash(password, 10, async function (err, hash) {
+            let passQuery = `SELECT password from user where userId =${userId}`;
+            let passQueryResults = await db.query(sql);
+            passQueryResults.results.length < 1 ? responseSender(res, `No User Found`) : oldPass = passQueryResults.results[0].password;
+            bcrypt.compare(password, oldPass, function (err, result) {
                 if (err) {
-                    res.send({
-                        message: "Error"
-                    });
+                    responseSender(res, `Error`)
                 }
-                if (hash) {
-                    const sql1 = `UPDATE user set password = '${hash}',previousPassword='${oldPass}' where userId =${userId} `;
-                    try {
-                        let {
-                            results
-                        } = await db.query(sql1);
-                        if (results) {
-                            res.send({
-                                message: "Password Updated Succesfully"
-                            })
-                        }
-                    } catch (error) {
-                        res.send({
-                            message: "Error Updating Password",
-                        });
+
+                result === true ? responseSender(res, `You can't use the Previous Password`) : bcrypt.hash(password, 10, async function (err, hash) {
+                    if (err) { responseSender(res, `Error`) }
+                    if (hash) {
+                        let updateQuery = `UPDATE user set password = '${hash}',previousPassword='${oldPass}' where userId =${userId} `;
+                        let uR = await db.query(updateQuery);
+                        uR.results ? responseSender(res, `Password Updated Succesfully`) : responseSender(res, `Error Updating Password`);
                     }
-                }
+                });
             })
         }
-    })
+    } catch (error) {
+        responseSender(res, error)
+    }
 })
 
 //Get all Users Based on ManagerId
 
 router.get("/manager/:userid", auth, async (req, res) => {
-    let userId = req.params.userid;
-    let results = [];
-    const checkquery = `SELECT teamId,managerId,isManager from user WHERE userId = ${userId}`;
-    let checkResults = await db.query(checkquery);
-    let teamId = checkResults.results[0].teamId;
-    let isManager = checkResults.results[0].isManager;
-    if (isManager === 1) {
-        const sql = `SELECT teamId,name from team WHERE managerId = ${userId}`;
-        let teamresultsquery = await db.query(sql);
-        let mainteams = teamresultsquery.results;
-        results.push(mainteams);
-        for (let i = 0; i < mainteams.length; i++) {
+    try {
+        let userId = req.params.userid;
+        let results = [];
+        const checkquery = `SELECT teamId,managerId,isManager from user WHERE userId = ${userId}`;
+        let teamId = checkResults.results[0].teamId;
+        let isManager = checkResults.results[0].isManager;
+        let checkResults = await db.query(checkquery);
+        if (isManager === 1) {
+            const sql = `SELECT teamId,name from team WHERE managerId = ${userId}`;
+            let teamresultsquery = await db.query(sql);
+            let mainteams = teamresultsquery.results;
+            results.push(mainteams);
+            for (let i = 0; i < mainteams.length; i++) {
+                let r = []
+                results[0][i].managers = [];
+                let managers = await get_managers(mainteams[i].teamId);
+                for (let j = 0; j < managers.length; j++) {
+                    r.push([managers[j]])
+                }
+                let managersummary = await manager_summary(mainteams[i].teamId);
+                let rr = teams_splitter(managersummary);
+                for (let k = 0; k < rr.length; k++) {
+                    r[k].push(rr[k])
+                }
+                results[0][i].managers = r;
+                let users = await get_users(mainteams[i].teamId);
+                results[0][i].users = users;
+                results = results[0]
+                res.send({
+                    results
+                })
+            }
+        } else {
+            const teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
+            let teamqueryResults = await db.query(teamquery);
+            results.push(teamqueryResults.results[0]);
             let r = []
-            results[0][i].managers = [];
-            let managers = await get_managers(mainteams[i].teamId);
+            results[0].managers = [];
+            let managers = await get_managers(teamqueryResults.results[0].teamId);
             for (let j = 0; j < managers.length; j++) {
                 r.push([managers[j]])
             }
-            let managersummary = await manager_summary(mainteams[i].teamId);
-            let rr = teams_splitter(managersummary);
-            for (let k = 0; k < rr.length; k++) {
-                r[k].push(rr[k])
-            }
-            results[0][i].managers = r;
-            let users = await get_users(mainteams[i].teamId);
-            results[0][i].users = users;
+            results[0].managers = r;
+            let users = await get_users(teamqueryResults.results[0].teamId);
+            results[0].users = users;
+            res.send({
+                results,
+            })
         }
-        results = results[0]
-        res.send({
-            results
-        })
-    } else {
-        const teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
-        let teamqueryResults = await db.query(teamquery);
-        results.push(teamqueryResults.results[0]);
-        let r = []
-        results[0].managers = [];
-        let managers = await get_managers(teamqueryResults.results[0].teamId);
-        for (let j = 0; j < managers.length; j++) {
-            r.push([managers[j]])
-        }
-        results[0].managers = r;
-        let users = await get_users(teamqueryResults.results[0].teamId);
-        results[0].users = users;
-        res.send({
-            results,
-        })
+    } catch (error) {
+        responseSender(res, error)
     }
-
 })
 
 //Get all Users Based on TeamId
 
 router.get("/teams/:teamid", auth, async (req, res) => {
-    let results = [];
-    let teamId = req.params.teamid;
-    const teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
-    let teamqueryResults = await db.query(teamquery);
-    results.push(teamqueryResults.results[0]);
-    let r = []
-    results[0].managers = [];
-    let managers = await get_managers(teamId);
-    for (let j = 0; j < managers.length; j++) {
-        r.push([managers[j]])
+    try {
+        let results = [];
+        let teamId = req.params.teamid;
+        let teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
+        let teamqueryResults = await db.query(teamquery);
+        results.push(teamqueryResults.results[0]);
+        let r = []
+        results[0].managers = [];
+        let managers = await get_managers(teamId);
+        for (let j = 0; j < managers.length; j++) {
+            r.push([managers[j]])
+        }
+        let managersummary = await manager_summary(teamId);
+        let rr = teams_splitter(managersummary);
+        for (let k = 0; k < rr.length; k++) {
+            r[k].push(rr[k])
+        }
+        results[0].managers = r;
+        let users = await get_users(teamId);
+        results[0].users = users;
+        res.send({
+            results,
+        })
+    } catch (error) {
+        responseSender(res, error)
     }
-    let managersummary = await manager_summary(teamId);
-    let rr = teams_splitter(managersummary);
-    for (let k = 0; k < rr.length; k++) {
-        r[k].push(rr[k])
-    }
-    results[0].managers = r;
-    let users = await get_users(teamId);
-    results[0].users = users;
-    res.send({
-        results,
-    })
 })
 
 //Deepdive DropDown
@@ -860,23 +859,18 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
         let teamId = req.body.teamId;
         if (managerId || teamId) {
             if (managerId && teamId) {
-                res.send({
-                    message: "Both ManagerId and Teamid Passed"
-                })
+                responseSender(res, `Both ManagerId and Teamid Passed`);
             } else {
                 if (managerId) {
                     let uR = await getUserInfo(req.userId);
-                    if (uR.isManager === 1) {
+                    if (uR.isManager === 0) {
+                        responseSender(res, `You dont have Access`);
+                    } else {
                         const getTeamId = `SELECT DISTINCT(teamId)
                                     FROM user   
                                     WHERE managerId = ${managerId}`;
                         let getTeamIdR = await db.query(getTeamId);
                         results = await getTeamMembers(getTeamIdR.results)
-                    }
-                    if (uR.isManager === 0) {
-                        res.send({
-                            message: "You dont have Access"
-                        })
                     }
                 }
                 if (teamId) {
@@ -896,14 +890,10 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
                 }
             }
         } else {
-            res.send({
-                message: "Missing Fields"
-            })
+            responseSender(res, `Missing Fields`);
         }
     } catch (error) {
-        res.send({
-            message: "Error",
-        })
+        responseSender(res, error);
     }
 })
 
@@ -913,107 +903,100 @@ router.post("/deepdive/", auth, async (req, res) => {
     try {
         let userId = req.body.userId;
         let userInfo = await getUserInfo(req.userId);
-        if (userInfo.isManager === 0) {
-            if (userInfo.userId != userId) {
-                res.send({
-                    message: "You dont have Access"
-                })
+        let ac = await checkAccess(req.userId, userInfo.isManager, req.body.userId);
+        if (ac === false) {
+            responseSender(res, `You dont have Access`);
+        } else {
+            let companyId = userInfo.companyId;
+            let companyInfo = await getCompanyInfo(companyId);
+            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 0) {
+                responseSender(res, `Both Webcam and Screenshot disabled`);
             }
-        }
-        let companyId = userInfo.companyId;
-        let companyInfo = await getCompanyInfo(companyId);
-        if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 0) {
-            res.send({
-                message: "Both Webcam and Screenshot disabled "
-            })
-        }
-        if (userId) {
-            let date;
-            if (req.body.date) {
-                date = new Date(req.body.date);
+            if (!userId) {
+                responseSender(res, `Missing UserId`);
             } else {
-                date = new Date();
-            }
-            var dateArray = getDates(startOfWeek(date), endOfWeek(date));
-            let rr = [];
-            let dailysummary = []
-            async function query(date, userId) {
-                let r1 = []
-                const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}' ORDER BY timecard ASC`;
-                let dqr = await db.query(dq);
-                if (dqr.results.length > 0) {
-                    let deepdive = dqr.results;
-                    let Ds = await DailySummary(userId, date);
-                    if (Ds) {
-                        dailysummary.push({
-                            date: date,
-                            hoursLogged: Ds.hoursLogged,
-                            focusScore: Ds.focusScore,
-                            intensityScore: Ds.intensityScore,
-                            alignmentScore: Ds.alignmentScore,
-                        })
+                let date;
+                date = req.body.date ? new Date(req.body.date) : new Date();
+                var dateArray = getDates(startOfWeek(date), endOfWeek(date));
+                let rr = [];
+                let dailysummary = [];
+                async function query(date, userId) {
+                    let r1 = []
+                    const dq = `SELECT DAYNAME(timecard)as tday,HOUR(timecard) as hour,TIME(timecard) as time,timecardId,timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,focus,intensityScore FROM timecard WHERE userId=${userId} AND DATE(timecard) = '${date}' ORDER BY timecard ASC`;
+                    let dqr = await db.query(dq);
+                    if (dqr.results.length > 0) {
+                        let deepdive = dqr.results;
+                        let Ds = await DailySummary(userId, date);
+                        if (Ds) {
+                            dailysummary.push({
+                                date: date,
+                                hoursLogged: Ds.hoursLogged,
+                                focusScore: Ds.focusScore,
+                                intensityScore: Ds.intensityScore,
+                                alignmentScore: Ds.alignmentScore,
+                            })
+                        }
+                        for (let i = 0; i < deepdive.length; i++) {
+                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
+                                let r = {
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timecard: deepdive[i].timecard,
+                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                    status: deepdive[i].status,
+                                    focus: deepdive[i].focus,
+                                    intensityScore: deepdive[i].intensityScore,
+                                }
+                                r1.push(r);
+                            }
+                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 0) {
+                                let r = {
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timecard: deepdive[i].timecard,
+                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                    status: deepdive[i].status,
+                                    focus: deepdive[i].focus,
+                                    intensityScore: deepdive[i].intensityScore,
+                                }
+                                r1.push(r);
+                            }
+                            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 1) {
+                                let r = {
+                                    timecardId: deepdive[i].timecardId,
+                                    tday: deepdive[i].tday,
+                                    hour: deepdive[i].hour,
+                                    time: deepdive[i].time,
+                                    timecard: deepdive[i].timecard,
+                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                    status: deepdive[i].status,
+                                    focus: deepdive[i].focus,
+                                    intensityScore: deepdive[i].intensityScore,
+                                }
+                                r1.push(r);
+                            }
+                        }
+                        let a = groupBy(r1, 'hour');
+                        rr.push(a);
                     }
-                    for (let i = 0; i < deepdive.length; i++) {
-                        if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
-                            let r = {
-                                timecardId: deepdive[i].timecardId,
-                                tday: deepdive[i].tday,
-                                hour: deepdive[i].hour,
-                                time: deepdive[i].time,
-                                timecard: deepdive[i].timecard,
-                                screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
-                                screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
-                                webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
-                                webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
-                                status: deepdive[i].status,
-                                focus: deepdive[i].focus,
-                                intensityScore: deepdive[i].intensityScore,
-                            }
-                            r1.push(r);
-                        }
-                        if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 0) {
-                            let r = {
-                                timecardId: deepdive[i].timecardId,
-                                tday: deepdive[i].tday,
-                                hour: deepdive[i].hour,
-                                time: deepdive[i].time,
-                                timecard: deepdive[i].timecard,
-                                webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
-                                webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
-                                status: deepdive[i].status,
-                                focus: deepdive[i].focus,
-                                intensityScore: deepdive[i].intensityScore,
-                            }
-                            r1.push(r);
-                        }
-                        if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 1) {
-                            let r = {
-                                timecardId: deepdive[i].timecardId,
-                                tday: deepdive[i].tday,
-                                hour: deepdive[i].hour,
-                                time: deepdive[i].time,
-                                timecard: deepdive[i].timecard,
-                                screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
-                                screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
-                                status: deepdive[i].status,
-                                focus: deepdive[i].focus,
-                                intensityScore: deepdive[i].intensityScore,
-                            }
-                            r1.push(r);
-                        }
-                    }
-                    let a = groupBy(r1, 'hour');
-                    rr.push(a);
                 }
-            }
-            let startDate = dateArray[0];
-            let endDate = dateArray[dateArray.length - 1];
-            for (let d = 0; d < dateArray.length; d++) {
-                await query(dateArray[d], userId)
-            }
-            let wS = await WeekSummary(userId, startDate);
-            if (rr.length > 0) {
-                res.send({
+                let startDate = dateArray[0];
+                let endDate = dateArray[dateArray.length - 1];
+                for (let d = 0; d < dateArray.length; d++) {
+                    await query(dateArray[d], userId)
+                }
+                let wS = await WeekSummary(userId, startDate);
+
+                rr.length > 0 ? res.send({
                     startDate,
                     endDate,
                     hoursLogged: wS ? wS.hoursLogged : null,
@@ -1022,21 +1005,114 @@ router.post("/deepdive/", auth, async (req, res) => {
                     alignmentScore: wS ? wS.alignmentScore : null,
                     dailysummary,
                     results: rr
-                })
-            } else {
-                res.send({
-                    message: "No Results Found"
-                })
+                }) : responseSender(res, `No timecards available`);
             }
-        } else {
-            res.send({
-                message: "Missing UserId"
-            })
         }
     } catch (e) {
-        res.send({
-            message: "Error",
-        })
+        responseSender(res, e);
+    }
+})
+
+//Details Route
+
+router.post("/details", auth, async (req, res) => {
+    try {
+        let userId = req.body.userId;
+        let userInfo = await getUserInfo(req.userId);
+        let ac = await checkAccess(req.userId, userInfo.isManager, req.body.userId);
+        if (ac === false) {
+            responseSender(res, `You dont have Access`);
+        } else {
+            let companyId = req.body.companyId;
+            if (!companyId) {
+                responseSender(res, `Missing Company Id`);
+            } else {
+                let companyInfo = await getCompanyInfo(companyId);
+                if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 0) {
+                    responseSender(res, `Both Webcam and Screenshot disabled`);
+                }
+                if (!userId) {
+                    responseSender(res, `Missing UserId`);
+                } else {
+                    let date;
+                    date = req.body.date ? new Date(req.body.date) : new Date();
+                    var dateArray = getDates(startOfWeek(date), endOfWeek(date));
+                    let rr = [];
+                    async function query(date, userId) {
+                        let r1 = []
+                        const dq = `SELECT DAYNAME(timeCardBreakup)as tday,HOUR(timeCardBreakup) as hour,TIME(timeCardBreakup) as time,timecardBreakupId,timecardId,timeCardBreakup,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,managerComment,commentShared FROM  timecardBreakup WHERE userId=${userId} AND DATE(timeCardBreakup) = '${date}' ORDER BY time`;
+                        let dqr = await db.query(dq);
+                        if (dqr.results.length > 0) {
+                            let deepdive = dqr.results;
+                            for (let i = 0; i < deepdive.length; i++) {
+                                if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
+                                    let r = {
+                                        timecardBreakupId: deepdive[i].timecardBreakupId,
+                                        timecardId: deepdive[i].timecardId,
+                                        tday: deepdive[i].tday,
+                                        hour: deepdive[i].hour,
+                                        time: deepdive[i].time,
+                                        timeCardBreakup: deepdive[i].timeCardBreakup,
+                                        screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                        screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                        webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                        webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                        managerComment: deepdive[i].managerComment,
+                                        commentShared: deepdive[i].commentShared,
+                                    }
+                                    r1.push(r);
+                                }
+                                if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 0) {
+                                    let r = {
+                                        timecardBreakupId: deepdive[i].timecardBreakupId,
+                                        timecardId: deepdive[i].timecardId,
+                                        tday: deepdive[i].tday,
+                                        hour: deepdive[i].hour,
+                                        time: deepdive[i].time,
+                                        timeCardBreakup: deepdive[i].timeCardBreakup,
+                                        webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
+                                        webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
+                                        managerComment: deepdive[i].managerComment,
+                                        commentShared: deepdive[i].commentShared,
+                                    }
+                                    r1.push(r);
+                                }
+                                if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 1) {
+                                    let r = {
+                                        timecardBreakupId: deepdive[i].timecardBreakupId,
+                                        timecardId: deepdive[i].timecardId,
+                                        tday: deepdive[i].tday,
+                                        hour: deepdive[i].hour,
+                                        time: deepdive[i].time,
+                                        timeCardBreakup: deepdive[i].timeCardBreakup,
+                                        screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
+                                        screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
+                                        managerComment: deepdive[i].managerComment,
+                                        commentShared: deepdive[i].commentShared,
+                                    }
+                                    r1.push(r);
+                                }
+                            }
+                            let a = groupBy(r1, 'hour');
+                            rr.push(a)
+                        }
+                    }
+                    let startDate = dateArray[0];
+                    let endDate = dateArray[dateArray.length - 1];
+                    for (let d = 0; d < dateArray.length; d++) {
+                        await query(dateArray[d], userId)
+                    }
+
+                    rr.length > 0 ? res.send({
+                        startDate,
+                        endDate,
+                        results: rr
+                    }) : responseSender(res, `No details available`);
+                }
+            }
+        }
+    } catch (error) {
+        responseSender(res, error);
     }
 })
 
@@ -1049,21 +1125,25 @@ router.post("/zoom", auth, async (req, res) => {
         let startDate = req.body.startDate;
         let endDate = req.body.endDate;
         if (timecardId && timecardBreakupId) {
-            res.send({
-                message: 'Send Either timecardId or timecardBreakupId'
-            })
+            responseSender(res, `Send Either timecardId or timecardBreakupId`);
         }
-        if (timecardId || timecardBreakupId) {
+        if (!(timecardId || timecardBreakupId)) {
+            responseSender(res, `Missing Data- Either Timecard or Timecard Breakup Id required`);
+        } else {
             if (timecardBreakupId) {
                 timecardId = await getTimecardId(timecardBreakupId);
             }
-            if (startDate && endDate) {
+            if (!(startDate && endDate)) {
+                responseSender(res, `Missing Start Date and End Date`);
+            } else {
                 let userInfo = await getUserInfo(req.userId);
                 let comapanyInfo = await getCompanyInfo(userInfo.companyId);
                 //Get all timecard data
-                const tQ = `SELECT YEAR(timecard) as timecardYear,MONTH(timecard) as timecardMonth,DAY(timecard)as timecardDay,HOUR(timecard) as timecardHour,MINUTE(timecard) as timecardMinute,timecard,userId,status,focus,intensityScore
-            FROM timecard 
-            WHERE timecardId = ${timecardId}`;
+                let tQ = `SELECT YEAR(timecard) as timecardYear,MONTH(timecard) as timecardMonth,DAY(timecard)as timecardDay,
+                            HOUR(timecard) as timecardHour,MINUTE(timecard) as timecardMinute,timecard,
+                            userId,status,focus,intensityScore
+                            FROM timecard 
+                            WHERE timecardId = ${timecardId}`;
                 let tQR = await db.query(tQ);
                 let timecardYear = tQR.results[0].timecardYear;
                 let timecardMonth = tQR.results[0].timecardMonth;
@@ -1076,8 +1156,13 @@ router.post("/zoom", auth, async (req, res) => {
                 let intensityScore = tQR.results[0].intensityScore;
                 //Querying from Timecard Breakup table
 
-                const tBQ = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,screenshotUrl,webcamUrl,managerComment,commentShared 
-            FROM timecardBreakup WHERE userId = ${userId} AND YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND MINUTE(timeCardBreakup) BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize - 1} ORDER BY timeCardBreakup ASC`;
+                const tBQ = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,screenshotUrl,webcamUrl,
+                            managerComment,commentShared FROM timecardBreakup WHERE userId = ${userId} AND 
+                            YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND 
+                            DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND 
+                            MINUTE(timeCardBreakup) 
+                            BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize - 1} 
+                            ORDER BY timeCardBreakup ASC`;
                 let tBQR = await db.query(tBQ);
                 let tB = tBQR.results;
                 let rr = [];
@@ -1107,142 +1192,10 @@ router.post("/zoom", auth, async (req, res) => {
                     NextTimeCard: PN.nTiD,
                     results: rr,
                 })
-            } else {
-                res.send({
-                    message: "Missing Start Date and End Date"
-                })
             }
-        } else {
-            res.send({
-                message: "Missing Data- Either Timecard or Timecard Breakup Id required"
-            })
         }
     } catch (error) {
-        res.send({
-            message: Error,
-        })
-    }
-})
-
-//Details Route
-
-router.post("/details", auth, async (req, res) => {
-    try {
-        let userId = req.body.userId;
-        let userInfo = await getUserInfo(req.userId);
-        if (userInfo.isManager === 0) {
-            if (userInfo.userId != userId) {
-                res.send({
-                    message: "You dont have Access"
-                })
-            }
-        }
-        let companyId = req.body.companyId;
-        if (companyId) {
-            let companyInfo = await getCompanyInfo(companyId);
-            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 0) {
-                res.send({
-                    message: "Both Webcam and Screenshot disabled "
-                })
-            }
-            if (userId) {
-                let date;
-                if (req.body.date) {
-                    date = new Date(req.body.date);
-                } else {
-                    date = new Date();
-                }
-                var dateArray = getDates(startOfWeek(date), endOfWeek(date));
-                let rr = [];
-                async function query(date, userId) {
-                    let r1 = []
-                    const dq = `SELECT DAYNAME(timeCardBreakup)as tday,HOUR(timeCardBreakup) as hour,TIME(timeCardBreakup) as time,timecardBreakupId,timecardId,timeCardBreakup,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,managerComment,commentShared FROM  timecardBreakup WHERE userId=${userId} AND DATE(timeCardBreakup) = '${date}' ORDER BY time`;
-                    let dqr = await db.query(dq);
-                    if (dqr.results.length > 0) {
-                        let deepdive = dqr.results;
-                        for (let i = 0; i < deepdive.length; i++) {
-                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 1) {
-                                let r = {
-                                    timecardBreakupId: deepdive[i].timecardBreakupId,
-                                    timecardId: deepdive[i].timecardId,
-                                    tday: deepdive[i].tday,
-                                    hour: deepdive[i].hour,
-                                    time: deepdive[i].time,
-                                    timeCardBreakup: deepdive[i].timeCardBreakup,
-                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
-                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
-                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
-                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
-                                    managerComment: deepdive[i].managerComment,
-                                    commentShared: deepdive[i].commentShared,
-                                }
-                                r1.push(r);
-                            }
-                            if (companyInfo.enablewebcam === 1 && companyInfo.enablescreenshot === 0) {
-                                let r = {
-                                    timecardBreakupId: deepdive[i].timecardBreakupId,
-                                    timecardId: deepdive[i].timecardId,
-                                    tday: deepdive[i].tday,
-                                    hour: deepdive[i].hour,
-                                    time: deepdive[i].time,
-                                    timeCardBreakup: deepdive[i].timeCardBreakup,
-                                    webcamUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/wclib/tmb/${deepdive[i].webcamUrl}`,
-                                    webcamUrl: `${CC.CDN_URL}/${companyId}/${userId}/wclib/${deepdive[i].webcamUrl}`,
-                                    managerComment: deepdive[i].managerComment,
-                                    commentShared: deepdive[i].commentShared,
-                                }
-                                r1.push(r);
-                            }
-                            if (companyInfo.enablewebcam === 0 && companyInfo.enablescreenshot === 1) {
-                                let r = {
-                                    timecardBreakupId: deepdive[i].timecardBreakupId,
-                                    timecardId: deepdive[i].timecardId,
-                                    tday: deepdive[i].tday,
-                                    hour: deepdive[i].hour,
-                                    time: deepdive[i].time,
-                                    timeCardBreakup: deepdive[i].timeCardBreakup,
-                                    screenshotUrl_thumb: `${CC.CDN_URL}/${companyId}/${userId}/sslib/tmb/${deepdive[i].screenshotUrl}`,
-                                    screenshotUrl: `${CC.CDN_URL}/${companyId}/${userId}/sslib/${deepdive[i].screenshotUrl}`,
-                                    managerComment: deepdive[i].managerComment,
-                                    commentShared: deepdive[i].commentShared,
-                                }
-                                r1.push(r);
-                            }
-                        }
-                        let a = groupBy(r1, 'hour');
-                        rr.push(a)
-                    }
-                }
-                let startDate = dateArray[0];
-                let endDate = dateArray[dateArray.length - 1];
-                for (let d = 0; d < dateArray.length; d++) {
-                    await query(dateArray[d], userId)
-                }
-                if (rr.length > 0) {
-                    res.send({
-                        startDate,
-                        endDate,
-                        results: rr
-                    })
-                } else {
-                    res.send({
-                        message: "No Results Found"
-                    })
-                }
-            } else {
-                res.send({
-                    message: "Missing UserId"
-                })
-            }
-        } else {
-            res.send({
-                message: "Missing Company Id"
-            })
-        }
-    } catch (error) {
-        res.send({
-            message: "Error",
-        })
+        responseSender(res, Error);
     }
 })
 
@@ -1252,33 +1205,19 @@ router.post("/flag/:timecard", auth, async (req, res) => {
     try {
         let userInfo = await getUserInfo(req.userId);
         let timecardId = req.params.timecard;
-        if (timecardId) {
-            if (userInfo.isManager === 1) {
+        if (!timecardId) {
+            responseSender(res, `No timecard specified to Flag`);
+        } else {
+            if (userInfo.isManager !== 1) {
+                responseSender(res, `You don't have access to flag timecard`);
+            } else {
                 const FlagQuery = `UPDATE timecard set status='flagged' WHERE timecardId=${timecardId}`;
                 let FlagQueryR = await db.query(FlagQuery);
-                if (FlagQueryR.results.affectedRows === 1) {
-                    res.send({
-                        message: "Successfully Flagged"
-                    })
-                } else {
-                    res.send({
-                        message: "Timecard with the specified ID Not Found"
-                    })
-                }
-            } else {
-                res.send({
-                    message: "You don't have access to flag timecard"
-                })
+                FlagQueryR.results.affectedRows === 1 ? responseSender(res, `Successfully Flagged`) : responseSender(res, `Timecard with the specified ID Not Found`);
             }
-        } else {
-            res.send({
-                message: "No timecard specified to Flag"
-            })
         }
     } catch (error) {
-        res.send({
-            message: "Error",
-        })
+        responseSender(res, error);
     }
 })
 
@@ -1290,14 +1229,20 @@ router.post("/comment/:id", auth, async (req, res) => {
         var date = today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate();
         var time = today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
         var dateTime = date + ' ' + time;
-        if (timecardBreakupId) {
+        if (!timecardBreakupId) {
+            responseSender(res, `No timecardBreakupId Specified`);
+        } else {
             let comment = req.body.comment;
-            if (comment) {
-                const sql = `SELECT managerComment
+            if (!comment) {
+                responseSender(res, `Please Send Some Mesaage`);
+            } else {
+                let sql = `SELECT managerComment
                             FROM timecardBreakup
                             WHERE timecardBreakupId = ${timecardBreakupId}`;
                 let sqlR = await db.query(sql);
-                if (sqlR.results.length > 0) {
+                if (sqlR.results.length <= 0) {
+                    responseSender(res, `Wrong timecardBreakupId`);
+                } else {
                     let managerComment = sqlR.results[0].managerComment;
                     let mc = JSON.parse(managerComment) || [];
                     mc.push({
@@ -1309,64 +1254,31 @@ router.post("/comment/:id", auth, async (req, res) => {
                         SET managerComment = '${JSON.stringify(mc)}'
                         WHERE timecardBreakupId=${timecardBreakupId}`;
                     let IQR = await db.query(IQ);
-                    if (IQR.results.affectedRows > 0) {
-                        res.send({
-                            message: "Comment Sent"
-                        })
-                    } else {
-                        res.send({
-                            message: "Error During Updating Comment"
-                        })
-                    }
-                } else {
-                    res.send({
-                        message: "Wrong timecardBreakupId"
-                    })
+                    IQR.results.affectedRows > 0 ? responseSender(res, `Comment Sent`) : responseSender(res, `Error During Updating Comment`);
                 }
-            } else {
-                res.send({
-                    message: "Missing Data"
-                })
             }
-        } else {
-            res.send({
-                message: "No timecardBreakupId Specified"
-            })
         }
     } catch (error) {
-        res.send({
-            message: "Error",
-        })
+        responseSender(res, error)
     }
 })
 
 router.get("/comment/:id", auth, async (req, res) => {
     try {
         let timecardBreakupId = req.params.id;
-        if (timecardBreakupId) {
+        if (!timecardBreakupId) {
+            responseSender(res, `Missing timecardBreakupId`)
+        } else {
             const sql = `SELECT managerComment
                             FROM timecardBreakup
                             WHERE timecardBreakupId = ${timecardBreakupId}`;
             let sqlR = await db.query(sql);
-            if (sqlR.results.length > 0) {
-                res.send({
-                    message: JSON.parse(sqlR.results[0].managerComment)
-                })
-            } else {
-                res.send({
-                    message: "Wrong timecardBreakupId"
-                })
-            }
-        } else {
-            res.send({
-                message: "No timecardBreakupId Specified"
-            })
+
+            sqlR.results.length > 0 ? responseSender(res, JSON.parse(sqlR.results[0].managerComment)) : responseSender(res, `Wrong timecardBreakupId`)
         }
 
     } catch (error) {
-        res.send({
-            message: "Error"
-        })
+        responseSender(res, error)
     }
 })
 
