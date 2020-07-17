@@ -769,9 +769,9 @@ router.get("/manager/:userid", auth, async (req, res) => {
         let userId = req.params.userid;
         let results = [];
         const checkquery = `SELECT teamId,managerId,isManager from user WHERE userId = ${userId}`;
+        let checkResults = await db.query(checkquery);
         let teamId = checkResults.results[0].teamId;
         let isManager = checkResults.results[0].isManager;
-        let checkResults = await db.query(checkquery);
         if (isManager === 1) {
             const sql = `SELECT teamId,name from team WHERE managerId = ${userId}`;
             let teamresultsquery = await db.query(sql);
@@ -792,11 +792,11 @@ router.get("/manager/:userid", auth, async (req, res) => {
                 results[0][i].managers = r;
                 let users = await get_users(mainteams[i].teamId);
                 results[0][i].users = users;
-                results = results[0]
-                res.send({
-                    results
-                })
             }
+            results = results[0]
+            res.send({
+                results
+            })
         } else {
             const teamquery = `SELECT teamId,name from team WHERE teamId = ${teamId}`;
             let teamqueryResults = await db.query(teamquery);
