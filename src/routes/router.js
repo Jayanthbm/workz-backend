@@ -520,6 +520,21 @@ async function checkAccess(authId, isManager, requestedId) {
         return access;
     }
 }
+
+async function checkTimecardStatus(timecardId) {
+    let fQ = `SELECT status
+            FROM timecard 
+            WHERE timecardId=${timecardId}`;
+    let fQr = await db.query(fQ);
+    return fQr.results[0].status;
+}
+
+async function updateTImecardStatus(timecardId, status) {
+    let FlagQuery = `UPDATE timecard set status='${status}' 
+                    WHERE timecardId=${timecardId}`;
+    let FlagQueryR = await db.query(FlagQuery);
+    return FlagQueryR.results.affectedRows === 1 ? true : false;
+}
 //Routes
 //TODO remove route during production
 
@@ -1211,9 +1226,14 @@ router.post("/flag/:timecard", auth, async (req, res) => {
             if (userInfo.isManager !== 1) {
                 responseSender(res, `You don't have access to flag timecard`);
             } else {
-                const FlagQuery = `UPDATE timecard set status='flagged' WHERE timecardId=${timecardId}`;
-                let FlagQueryR = await db.query(FlagQuery);
-                FlagQueryR.results.affectedRows === 1 ? responseSender(res, `Successfully Flagged`) : responseSender(res, `Timecard with the specified ID Not Found`);
+                let status = await checkTimecardStatus(timecardId);
+                if (status === 'flagged') {
+                    let unflag = await updateTImecardStatus(timecardId, 'approved');
+                    unflag === true ? responseSender(res, `Successfully Unflagged`) : responseSender(res, `Timecard with the specified ID Not Found`);
+                } else {
+                    let flag = await updateTImecardStatus(timecardId, 'flagged');
+                    flag === true ? responseSender(res, `Successfully Flagged`) : responseSender(res, `Timecard with the specified ID Not Found`);
+                }
             }
         }
     } catch (error) {
