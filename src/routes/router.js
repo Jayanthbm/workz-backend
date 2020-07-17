@@ -535,6 +535,12 @@ async function updateTImecardStatus(timecardId, status) {
     let FlagQueryR = await db.query(FlagQuery);
     return FlagQueryR.results.affectedRows === 1 ? true : false;
 }
+
+function formatHoursLogged(hours) {
+    let h = Math.floor(hours);
+    let m = (hours - Math.floor(h)) * 60;
+    return m > 0 ? `${h} Hours ${Math.floor(m)} min` : `${h}hours`;
+}
 //Routes
 //TODO remove route during production
 
@@ -1010,13 +1016,12 @@ router.post("/deepdive/", auth, async (req, res) => {
                     await query(dateArray[d], userId)
                 }
                 let wS = await WeekSummary(userId, startDate);
-
                 rr.length > 0 ? res.send({
                     startDate,
                     endDate,
-                    hoursLogged: wS ? wS.hoursLogged : null,
+                    hoursLogged: wS ? formatHoursLogged(wS.hoursLogged) : null,
                     focusScore: wS ? wS.focusScore : null,
-                    intensityScore: wS ? wS.focusScore : null,
+                    intensityScore: wS ? wS.intensityScore : null,
                     alignmentScore: wS ? wS.alignmentScore : null,
                     dailysummary,
                     results: rr
