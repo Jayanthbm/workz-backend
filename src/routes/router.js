@@ -674,6 +674,50 @@ router.post("/validate", async (req, res) => {
     }
 
 })
+
+//Refresh token route
+
+router.post("/refresh", auth, async (req, res) => {
+    let userInfo = await getUserInfo(req.userId);
+    let compnayId = userInfo.companyId;
+    const policy = JSON.stringify({
+        Statement: [
+            {
+                Resource: CC.cfurl + compnayId + '/*',
+                Condition: {
+                    DateLessThan: {
+                        'AWS:EpochTime':
+                            Math.floor(new Date().getTime() / 1000) + 60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
+                    },
+                },
+            },
+        ],
+    });
+    const cookie = cloudFront.getSignedCookie({
+        policy,
+    });
+    const token = await create_token(req.userId, '3h')
+    res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
+        domain,
+        path: '/',
+        httpOnly: true,
+    });
+
+    res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
+        domain,
+        path: '/',
+        httpOnly: true,
+    });
+
+    res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
+        domain,
+        path: '/',
+        httpOnly: true,
+    });
+    res.send({
+        newToken: token
+    })
+})
 //Logout Route to clear Cookies
 
 router.post("/logout", async (req, res) => {
