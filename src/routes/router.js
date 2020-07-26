@@ -1506,6 +1506,9 @@ router.post("/manualtimecard", auth, async (req, res) => {
         let startTime = req.body.startTime;
         let EndTime = req.body.EndTime;
         let reason = req.body.reason;
+        let manualtimecardIds = req.body.manualtimecardIds;
+        let comments = req.body.comments;
+        let status = req.body.status;
         let userInfo = await getUserInfo(userId);
         if (method === 'list') {
             if (userInfo.isManager !== 1) {
@@ -1538,7 +1541,21 @@ router.post("/manualtimecard", auth, async (req, res) => {
             if (userInfo.isManager !== 1) {
                 responseSender(res, `You don't have access`);
             } else {
-
+                if (!manualtimecardIds) {
+                    responseSender(res, 'No Id Specified');
+                } else {
+                    let st = true;
+                    for (let t = 0; t < manualtimecardIds.length; t++) {
+                        let ud = await manualTimecardHandler('update', manualtimecardIds[t], {
+                            approverComments: comments,
+                            status: status
+                        });
+                        if (ud === false || ud === null) {
+                            st = false;
+                        }
+                    }
+                    st ? responseSender(res, 'Manual Timecard Updated Successfully') : responseSender(res, 'Error During Updating Manual Timecard');
+                }
             }
         }
     } catch (error) {
@@ -1547,19 +1564,82 @@ router.post("/manualtimecard", auth, async (req, res) => {
 })
 
 router.post("/mytasks", auth, async (req, res) => {
+    try {
 
+    } catch (error) {
+        responseSender(res, error)
+    }
 })
 
 router.post("/newcompany", auth, async (req, res) => {
-
+    try {
+        let method = req.body.method || 'list'; // list,add,delete
+        let compnayId = req.body.compnayId;
+        //Data for Adding New Compnay
+        let name = req.body.name;
+        let fullName = req.body.fullName;
+        let address = req.body.address;
+        let city = req.body.city;
+        let state = req.body.state;
+        let pincode = req.body.pincode;
+        let country = req.body.country;
+        let billingPlan = req.body.billingPlan;
+        let billingRate = req.body.billingRate;
+        let billingCurrency = req.body.billingCurrency;
+        let timecardsize = req.body.timecardsize;
+        let timecardbreakupsize = req.body.timecardbreakupsize;
+        let enablewebcam = req.body.enablewebcam;
+        let enablescreenshot = req.body.enablescreenshot;
+        let mousePerTC = req.body.mousePerTC;
+        let keysPerTC = req.body.keysPerTC;
+        let IntDiscard = req.body.IntDiscard;
+        let intRed = req.body.intRed;
+        let intYellow = req.body.intYellow;
+        let termsConditions = req.body.termsConditions;
+        let updated = req.body.updated;
+        let updatedBy = req.body.updatedBy;
+        //TODO check access
+        if (method === 'list') {
+            let cQ = `SELECT name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy
+            FROM company
+            WHERE status ='active'`;
+            let cQR = await db.query(cQ);
+            cQR.results < 1 ? responseSender(res, `No Company to List`) : res.send(cQR.results);
+        }
+        if (method === 'add') {
+            res.send({
+                hello: "Coming Soon",
+                message: req.body
+            })
+        }
+        if (method === 'delete') {
+            if (!compnayId) {
+                responseSender(res, `No CompanyId`)
+            } else {
+                let uQ = `UPDATE company SET status ='Inactive' WHERE companyId=${compnayId}`;
+                let uQR = await db.query(uQ);
+                uQR.results.affectedRows === 1 ? responseSender(res, `Updated`) : responseSender(res, `Error During Update`);
+            }
+        }
+    } catch (error) {
+        responseSender(res, error)
+    }
 })
 
 router.post("/teamhandler", auth, async (req, res) => {
+    try {
 
+    } catch (error) {
+        responseSender(res, error)
+    }
 })
 
 router.post("/userhandler", auth, async (req, res) => {
+    try {
 
+    } catch (error) {
+        responseSender(res, error)
+    }
 })
 // Ram: This API is required outside of SaaS app.
 // Todo: this requires updation every time there is a change in /login authenticaiton logic
