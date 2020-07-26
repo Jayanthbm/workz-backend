@@ -358,7 +358,7 @@ async function getTeamMembers(teamId) {
         tid = teamId
     }
 
-    const sql = `SELECT userId ,name 
+    const sql = `SELECT userId ,name,isManager
                 FROM user
                 WHERE teamId IN (${tid})
                 ORDER BY name ASC`;
@@ -540,6 +540,77 @@ function formatHoursLogged(hours) {
     let h = Math.floor(hours);
     let m = (hours - Math.floor(h)) * 60;
     return m > 0 ? `${h} Hours ${Math.floor(m)} min` : `${h}hours`;
+}
+
+async function getMemberIds(userId, type) {
+    let userInfo = await getUserInfo(userId);
+    let memberIds = [];
+    if (userInfo.isManager === 1) {
+        if (type === 'Direct') {
+            let teamIds = await getTeams(userId);
+            for (let i = 0; i < teamIds.length; i++) {
+                let members = await getTeamMembers(teamIds[i].teamId);
+                for (j = 0; j < members.length; j++) {
+                    memberIds.push(members[j].userId);
+                }
+            }
+        }
+        if (type === 'Full') {
+            let teamIds = await getTeams(userId);
+            for (let i = 0; i < teamIds.length; i++) {
+                let members = await getTeamMembers(teamIds[i].teamId);
+                for (j = 0; j < members.length; j++) {
+                    if (members[j].isManager === 1) {
+                        let t = await getTeams(members[j].userId);
+                        for (k = 0; k < t.length; k++) {
+                            let m = await getTeamMembers(t[i].teamId);
+                            for (let l = 0; l < m.length; l++) {
+                                memberIds.push(m[l].userId);
+                            }
+                        }
+                    } else {
+                        memberIds.push(members[j].userId);
+                    }
+                }
+            }
+        }
+        return memberIds;
+    } else {
+        return null;
+    }
+}
+
+async function timecardDisputesHandler(method, timecardId, data) {
+    if (timecardId) {
+        if (method === 'add') {
+            let itQ = `INSERT INTO timecardDisputes (timecardId,userId,disputeReason,status)VALUES(${timecardId},${data.userId},'${data.disputeReason}','${data.status}')`;
+            let itQR = await db.query(itQ);
+            return itQR.results.affectedRows === 1 ? true : false;
+        }
+        if (method === 'update') {
+            let utQ = `UPDATE timecardDisputes SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE timecardId = ${timecardId}`;
+            let utQR = await db.query(utQ);
+            return utQR.results.affectedRows === 1 ? true : false;
+        }
+    } else {
+        return null;
+    }
+}
+async function manualTimecardHandler(method, userId, data) {
+    if (userId) {
+        if (method === 'add') {
+            let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${userId},'${data.startTime}','${data.endTime}','${data.reason}','${data.status}')`;
+            let imQR = await db.query(imQ);
+            return imQR.results.affectedRows === 1 ? true : false;
+        }
+        if (method === 'update') {
+            let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${data.manualTimeId}`;
+            let umQR = await db.query(umQ);
+            return umQR.results.affectedRows === 1 ? true : false;
+        }
+    } else {
+        return null;
+    }
 }
 //Routes
 //TODO remove route during production
@@ -1351,6 +1422,145 @@ router.get("/comment/:id", auth, async (req, res) => {
     }
 })
 
+router.post("/timecard", auth, async (req, res) => {
+    try {
+        let userId = req.userId;
+        let method = req.body.method || 'list'; // list,request,approval
+        let hierarchy = req.body.hierarchy || 'Direct';//Direct,Full
+        let timecardIds = req.body.timecardIds;
+        let comments = req.body.comments;
+        let status = req.body.status;
+        let userInfo = await getUserInfo(userId);// approved,rejected
+        if (method === 'list') {
+            if (userInfo.isManager !== 1) {
+                responseSender(res, `You Don't have access`);
+            } else {
+                let memberIds = await getMemberIds(userId, hierarchy);
+                //Get list of timecardDisputes
+                let tDQ = `SELECT timecardDisputes.disputeReason,timecard.timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl
+                        FROM timecardDisputes,timecard
+                        WHERE timecard.timecardId =timecardDisputes.timecardId AND timecardDisputes.userID IN(${memberIds.toString()})AND timecardDisputes.status = 'open'`;
+
+                let tDQR = await db.query(tDQ);
+                tDQR.results.length < 1 ? responseSender(res, 'No Open Disputes') : res.send(tDQR.results);
+            }
+        }
+        if (method === 'delete') {
+            if (!timecardIds) {
+                responseSender(res, 'No timecard Specified');
+            } else {
+                //TODO delete timecard
+            }
+        }
+        if (method === 'request') {
+            if (!timecardIds) {
+                responseSender(res, 'No timecard Specified');
+            } else {
+                let st = true;
+                for (let t = 0; t < timecardIds.length; t++) {
+                    let id = await timecardDisputesHandler('add', timecardIds[t], {
+                        userId,
+                        disputeReason: comments,
+                        status: 'open'
+                    });
+                    if (id === false || id === null) {
+                        st = false;
+                    }
+                }
+                st ? responseSender(res, 'Dispute Raised Successfully') : responseSender(res, 'Error During Raising Dispute');
+            }
+        }
+        if (method === 'approval') {
+            if (userInfo.isManager !== 1) {
+                responseSender(res, `You don't have access`);
+            } else {
+                if (!timecardIds) {
+                    responseSender(res, 'No timecard Specified');
+                } else {
+                    let st = true;
+                    for (let t = 0; t < timecardIds.length; t++) {
+                        let ud = await timecardDisputesHandler('update', timecardIds[t], {
+                            approverComments: comments,
+                            status: status
+                        });
+                        if (ud === false || ud === null) {
+                            st = false;
+                        }
+                    }
+                    //TODO Update Daily Summary
+                    st ? responseSender(res, 'Dispute Updated Successfully') : responseSender(res, 'Error During Updating Dispute');
+                }
+            }
+        }
+    } catch (error) {
+        responseSender(res, error)
+    }
+})
+
+router.post("/manualtimecard", auth, async (req, res) => {
+    try {
+        let userId = req.userId;
+        let method = req.body.method || 'list'; //list,request,approval
+        let hierarchy = req.body.hierarchy || 'Direct';//Direct,Full
+        let date = req.body.date;
+        let startTime = req.body.startTime;
+        let EndTime = req.body.EndTime;
+        let reason = req.body.reason;
+        let userInfo = await getUserInfo(userId);
+        if (method === 'list') {
+            if (userInfo.isManager !== 1) {
+                responseSender(res, `You don't have access`);
+            } else {
+                let memberIds = await getMemberIds(userId, hierarchy);
+                //Get list of ManualTimecards
+                let mtQ = `SELECT manualTimeId,startTime,endTime,manualTimeReason
+                        FROM manualTime
+                        WHERE manualTime.userID IN(${memberIds.toString()})AND manualTime.status = 'open'`;
+
+                let mtQR = await db.query(mtQ);
+                mtQR.results.length < 1 ? responseSender(res, 'No Manual Timecards requested') : res.send(mtQR.results);
+            }
+        }
+        if (method === 'request') {
+            if (!(date && startTime && EndTime && reason)) {
+                responseSender(res, `Missing Fields`);
+            } else {
+                let r = await manualTimecardHandler('add', userId, {
+                    startTime: startTime,
+                    endTime: EndTime,
+                    reason: reason,
+                    status: 'open'
+                })
+                r ? responseSender(res, 'Manual Timecard Requested Successfully') : responseSender(res, 'Error During requesting Manula Timecard');
+            }
+        }
+        if (method === 'approval') {
+            if (userInfo.isManager !== 1) {
+                responseSender(res, `You don't have access`);
+            } else {
+
+            }
+        }
+    } catch (error) {
+        responseSender(res, error)
+    }
+})
+
+router.post("/mytasks", auth, async (req, res) => {
+
+})
+
+router.post("/newcompany", auth, async (req, res) => {
+
+})
+
+router.post("/teamhandler", auth, async (req, res) => {
+
+})
+
+router.post("/userhandler", auth, async (req, res) => {
+
+})
 // Ram: This API is required outside of SaaS app.
 // Todo: this requires updation every time there is a change in /login authenticaiton logic
 router.post("/cServerAuth", async (req, res) => {
