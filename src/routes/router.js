@@ -498,7 +498,7 @@ function responseSender(res, message) {
 
 async function checkAccess(authId, isManager, requestedId) {
     if (isManager === 0) {
-        return authId === requestedId ? true : false;
+        return authId == requestedId ? true : false;
     }
     if (isManager === 1) {
         //Get all team
