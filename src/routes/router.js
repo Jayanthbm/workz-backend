@@ -78,7 +78,7 @@ async function getUserIdfromTeam(teamId) {
 async function getTeams(userId) {
     try {
         let TQ = `SELECT team.teamId,team.name
-            FROM team 
+            FROM team
             WHERE managerId = ${userId}`;
         let TQR = await db.query(TQ);
         return TQR.results
@@ -99,7 +99,7 @@ async function generate_dropdown(userId, isManager) {
         if (isManager === 1) {
             //Get the main team of user
             let MQ = `SELECT user.teamId,team.name
-            FROM user,team 
+            FROM user,team
             WHERE user.userId = ${userId} AND user.teamId = team.teamId`;
             let MQR = await db.query(MQ);
             dp.push(MQR.results[0])
@@ -265,7 +265,7 @@ async function team_summary(teamid, userId) {
     return teamSummary
 }
 
-//Get All teams of the 
+//Get All teams of the
 
 async function get_teams(userId) {
     const sql = `SELECT teamId from team WHERE managerId =${userId}`;
@@ -523,14 +523,14 @@ async function checkAccess(authId, isManager, requestedId) {
 
 async function checkTimecardStatus(timecardId) {
     let fQ = `SELECT status
-            FROM timecard 
+            FROM timecard
             WHERE timecardId=${timecardId}`;
     let fQr = await db.query(fQ);
     return fQr.results[0].status;
 }
 
 async function updateTImecardStatus(timecardId, status) {
-    let FlagQuery = `UPDATE timecard set status='${status}' 
+    let FlagQuery = `UPDATE timecard set status='${status}'
                     WHERE timecardId=${timecardId}`;
     let FlagQueryR = await db.query(FlagQuery);
     return FlagQueryR.results.affectedRows === 1 ? true : false;
@@ -876,7 +876,7 @@ router.post("/updatepass", auth, async (req, res) => {
             responseSender(res, `No User Found`)
         } else {
             let passQuery = `SELECT password from user where userId =${userId}`;
-            let passQueryResults = await db.query(sql);
+            let passQueryResults = await db.query(passQuery);
             passQueryResults.results.length < 1 ? responseSender(res, `No User Found`) : oldPass = passQueryResults.results[0].password;
             bcrypt.compare(password, oldPass, function (err, result) {
                 if (err) {
@@ -1003,7 +1003,7 @@ router.post('/deepdivedropdown', auth, async (req, res) => {
                         responseSender(res, `You dont have Access`);
                     } else {
                         const getTeamId = `SELECT DISTINCT(teamId)
-                                    FROM user   
+                                    FROM user
                                     WHERE managerId = ${managerId}`;
                         let getTeamIdR = await db.query(getTeamId);
                         results = await getTeamMembers(getTeamIdR.results)
@@ -1277,7 +1277,7 @@ router.post("/zoom", auth, async (req, res) => {
                 let tQ = `SELECT YEAR(timecard) as timecardYear,MONTH(timecard) as timecardMonth,DAY(timecard)as timecardDay,
                             HOUR(timecard) as timecardHour,MINUTE(timecard) as timecardMinute,timecard,
                             userId,status,focus,intensityScore
-                            FROM timecard 
+                            FROM timecard
                             WHERE timecardId = ${timecardId}`;
                 let tQR = await db.query(tQ);
                 let timecardYear = tQR.results[0].timecardYear;
@@ -1292,11 +1292,11 @@ router.post("/zoom", auth, async (req, res) => {
                 //Querying from Timecard Breakup table
 
                 const tBQ = `SELECT timecardBreakupId,timeCardBreakup,userId,clientId,screenshotUrl,webcamUrl,
-                            managerComment,commentShared FROM timecardBreakup WHERE userId = ${userId} AND 
-                            YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND 
-                            DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND 
-                            MINUTE(timeCardBreakup) 
-                            BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize - 1} 
+                            managerComment,commentShared FROM timecardBreakup WHERE userId = ${userId} AND
+                            YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND
+                            DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND
+                            MINUTE(timeCardBreakup)
+                            BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize - 1}
                             ORDER BY timeCardBreakup ASC`;
                 let tBQR = await db.query(tBQ);
                 let tB = tBQR.results;
