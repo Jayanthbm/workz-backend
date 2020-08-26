@@ -399,6 +399,7 @@ function getDates(startDate, stopDate) {
 	}
 	return dateArray;
 }
+
 function focusSetter(focus, timecardbreakupsize, timecardsize) {
 	if (focus * timecardbreakupsize >= timecardsize) {
 		return 1;
@@ -406,6 +407,7 @@ function focusSetter(focus, timecardbreakupsize, timecardsize) {
 		return 0;
 	}
 }
+
 function formatTime(timeString) {
 	let t = timeString[0] + timeString[1];
 	if (t === '12') {
@@ -421,6 +423,7 @@ function formatTime(timeString) {
 
 	return timeString;
 }
+
 function DT(date) {
 	let nd = toISOLocal(date).split('T');
 	let d = nd[0];
@@ -437,6 +440,7 @@ async function DailySummary(userId, Date) {
 	const sql = `SELECT dsId,dayName,hoursLogged,hoursFlagged,hoursRejected,FTAR,metricsCount,focusScore,intensityScore,alignmentScore,updated FROM dailySummary WHERE userId = ${userId} AND summaryDate = '${Date}'`;
 	return (await db.query(sql)).results[0];
 }
+
 function prevnext(array, timecardId) {
 	let index = 0;
 	let pTiD = 0;
@@ -1511,22 +1515,26 @@ router.post('/timecard', auth, async (req, res) => {
 		let hierarchy = req.body.hierarchy || 'Direct'; //Direct,Full
 		let timecardIds = req.body.timecardIds;
 		let comments = req.body.comments;
-		let status = req.body.status;
-		let userInfo = await getUserInfo(userId); // approved,rejected
+		let status = req.body.status; // approved,rejected
+		let userInfo = await getUserInfo(userId);
 		if (method === 'list') {
 			if (userInfo.isManager !== 1) {
 				responseSender(res, `You Don't have access`);
 			} else {
-				let memberIds = await getMemberIds(userId, hierarchy);
-				//Get list of timecardDisputes
-				let tDQ = `SELECT timecard.timecardId,timecardDisputes.disputeReason,timecard.timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl
+				if (hierarchy === 'Direct' || hierarchy === 'Full') {
+					let memberIds = await getMemberIds(userId, hierarchy);
+					//Get list of timecardDisputes
+					let tDQ = `SELECT timecard.timecardId,timecardDisputes.disputeReason,timecard.timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl
                         FROM timecardDisputes,timecard
                         WHERE timecard.timecardId =timecardDisputes.timecardId AND timecardDisputes.userID IN(${memberIds.toString()})AND timecardDisputes.status = 'open'`;
 
-				let tDQR = await db.query(tDQ);
-				tDQR.results.length < 1
-					? responseSender(res, 'No Open Disputes')
-					: res.send(tDQR.results);
+					let tDQR = await db.query(tDQ);
+					tDQR.results.length < 1
+						? responseSender(res, 'No Open Disputes')
+						: res.send(tDQR.results);
+				} else {
+					responseSender(res, 'hierarchy either Direct or Full');
+				}
 			}
 		}
 		if (method === 'delete') {
@@ -1574,9 +1582,11 @@ router.post('/timecard', auth, async (req, res) => {
 						}
 					}
 					//TODO Update Daily Summary
-					st
-						? responseSender(res, 'Dispute Updated Successfully')
-						: responseSender(res, 'Error During Updating Dispute');
+					if(st === true){
+						responseSender(res, 'Dispute Updated Successfully');
+					}else{
+						responseSender(res, 'Error During Updating Dispute');
+					}
 				}
 			}
 		}
