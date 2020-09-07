@@ -138,12 +138,10 @@ async function generate_dropdown(userId, isManager) {
 //Function to Create Token
 
 async function create_token(id, expiresIn) {
-	const token = jwt.sign(
-		{
+	const token = jwt.sign({
 			userId: id,
 		},
-		CC.SECRET_KEY,
-		{
+		CC.SECRET_KEY, {
 			expiresIn,
 		}
 	);
@@ -354,8 +352,7 @@ function groupBy(arr, key) {
 		(acc, x = {}) => ({
 			...acc,
 			[x[key]]: [...(acc[x[key]] || []), x],
-		}),
-		{}
+		}), {}
 	);
 }
 
@@ -654,9 +651,9 @@ router.post('/submitform', async (req, res) => {
 		} else {
 			let fI = `INSERT INTO queryForms(name,companyName,phone,email,description,typeRequest)VALUES('${name}','${companyName}','${phone}','${email}','${description}','${typeRequest}') `;
 			let fIr = await db.query(fI);
-			fIr.results.affectedRows === 1 && fIr.results.warningCount === 0
-				? responseSender(res, `Form Submitted Successfully`)
-				: responseSender(res, `Error Submiting Form`);
+			fIr.results.affectedRows === 1 && fIr.results.warningCount === 0 ?
+				responseSender(res, `Form Submitted Successfully`) :
+				responseSender(res, `Error Submiting Form`);
 		}
 	} catch (error) {
 		responseSender(res, error);
@@ -694,18 +691,15 @@ router.post('/login', async (req, res) => {
 						responseSender(res, `Error in Login`);
 					} else {
 						const policy = JSON.stringify({
-							Statement: [
-								{
-									Resource: CC.cfurl + companyId + '/*',
-									Condition: {
-										DateLessThan: {
-											'AWS:EpochTime':
-												Math.floor(new Date().getTime() / 1000) +
-												60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
-										},
+							Statement: [{
+								Resource: CC.cfurl + companyId + '/*',
+								Condition: {
+									DateLessThan: {
+										'AWS:EpochTime': Math.floor(new Date().getTime() / 1000) +
+											60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
 									},
 								},
-							],
+							}, ],
 						});
 						const cookie = cloudFront.getSignedCookie({
 							policy,
@@ -715,8 +709,7 @@ router.post('/login', async (req, res) => {
 						if (dp) {
 							res.cookie(
 								'CloudFront-Key-Pair-Id',
-								cookie['CloudFront-Key-Pair-Id'],
-								{
+								cookie['CloudFront-Key-Pair-Id'], {
 									domain,
 									path: '/',
 									httpOnly: true,
@@ -731,8 +724,7 @@ router.post('/login', async (req, res) => {
 
 							res.cookie(
 								'CloudFront-Signature',
-								cookie['CloudFront-Signature'],
-								{
+								cookie['CloudFront-Signature'], {
 									domain,
 									path: '/',
 									httpOnly: true,
@@ -781,17 +773,14 @@ router.post('/refresh', auth, async (req, res) => {
 	let userInfo = await getUserInfo(req.userId);
 	let compnayId = userInfo.companyId;
 	const policy = JSON.stringify({
-		Statement: [
-			{
-				Resource: CC.cfurl + compnayId + '/*',
-				Condition: {
-					DateLessThan: {
-						'AWS:EpochTime':
-							Math.floor(new Date().getTime() / 1000) + 60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
-					},
+		Statement: [{
+			Resource: CC.cfurl + compnayId + '/*',
+			Condition: {
+				DateLessThan: {
+					'AWS:EpochTime': Math.floor(new Date().getTime() / 1000) + 60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
 				},
 			},
-		],
+		}, ],
 	});
 	const cookie = cloudFront.getSignedCookie({
 		policy,
@@ -905,28 +894,28 @@ router.post('/updatepass', auth, async (req, res) => {
 		} else {
 			let passQuery = `SELECT password from user where userId =${userId}`;
 			let passQueryResults = await db.query(passQuery);
-			passQueryResults.results.length < 1
-				? responseSender(res, `No User Found`)
-				: (oldPass = passQueryResults.results[0].password);
+			passQueryResults.results.length < 1 ?
+				responseSender(res, `No User Found`) :
+				(oldPass = passQueryResults.results[0].password);
 			bcrypt.compare(password, oldPass, function (err, result) {
 				if (err) {
 					responseSender(res, `Error`);
 				}
 
-				result === true
-					? responseSender(res, `You can't use the Previous Password`)
-					: bcrypt.hash(password, 10, async function (err, hash) {
-							if (err) {
-								responseSender(res, `Error`);
-							}
-							if (hash) {
-								let updateQuery = `UPDATE user set password = '${hash}',previousPassword='${oldPass}' where userId =${userId} `;
-								let uR = await db.query(updateQuery);
-								uR.results
-									? responseSender(res, `Password Updated Succesfully`)
-									: responseSender(res, `Error Updating Password`);
-							}
-					  });
+				result === true ?
+					responseSender(res, `You can't use the Previous Password`) :
+					bcrypt.hash(password, 10, async function (err, hash) {
+						if (err) {
+							responseSender(res, `Error`);
+						}
+						if (hash) {
+							let updateQuery = `UPDATE user set password = '${hash}',previousPassword='${oldPass}' where userId =${userId} `;
+							let uR = await db.query(updateQuery);
+							uR.results ?
+								responseSender(res, `Password Updated Succesfully`) :
+								responseSender(res, `Error Updating Password`);
+						}
+					});
 			});
 		}
 	} catch (error) {
@@ -1179,18 +1168,18 @@ router.post('/deepdive/', auth, async (req, res) => {
 					await query(dateArray[d], userId);
 				}
 				let wS = await WeekSummary(userId, startDate);
-				rr.length > 0
-					? res.send({
-							startDate,
-							endDate,
-							hoursLogged: wS ? formatHoursLogged(wS.hoursLogged) : null,
-							focusScore: wS ? wS.focusScore : null,
-							intensityScore: wS ? wS.intensityScore : null,
-							alignmentScore: wS ? wS.alignmentScore : null,
-							dailysummary,
-							results: rr,
-					  })
-					: responseSender(res, `No timecards available`);
+				rr.length > 0 ?
+					res.send({
+						startDate,
+						endDate,
+						hoursLogged: wS ? formatHoursLogged(wS.hoursLogged) : null,
+						focusScore: wS ? wS.focusScore : null,
+						intensityScore: wS ? wS.intensityScore : null,
+						alignmentScore: wS ? wS.alignmentScore : null,
+						dailysummary,
+						results: rr,
+					}) :
+					responseSender(res, `No timecards available`);
 			}
 		}
 	} catch (e) {
@@ -1300,13 +1289,13 @@ router.post('/details', auth, async (req, res) => {
 						await query(dateArray[d], userId);
 					}
 
-					rr.length > 0
-						? res.send({
-								startDate,
-								endDate,
-								results: rr,
-						  })
-						: responseSender(res, `No details available`);
+					rr.length > 0 ?
+						res.send({
+							startDate,
+							endDate,
+							results: rr,
+						}) :
+						responseSender(res, `No details available`);
 				}
 			}
 		}
@@ -1422,14 +1411,14 @@ router.post('/flag/:timecard', auth, async (req, res) => {
 				let status = await checkTimecardStatus(timecardId);
 				if (status === 'flagged') {
 					let unflag = await updateTImecardStatus(timecardId, 'approved');
-					unflag === true
-						? responseSender(res, `Successfully Unflagged`)
-						: responseSender(res, `Timecard with the specified ID Not Found`);
+					unflag === true ?
+						responseSender(res, `Successfully Unflagged`) :
+						responseSender(res, `Timecard with the specified ID Not Found`);
 				} else {
 					let flag = await updateTImecardStatus(timecardId, 'flagged');
-					flag === true
-						? responseSender(res, `Successfully Flagged`)
-						: responseSender(res, `Timecard with the specified ID Not Found`);
+					flag === true ?
+						responseSender(res, `Successfully Flagged`) :
+						responseSender(res, `Timecard with the specified ID Not Found`);
 				}
 			}
 		}
@@ -1477,9 +1466,9 @@ router.post('/comment/:id', auth, async (req, res) => {
                         SET managerComment = '${JSON.stringify(mc)}'
                         WHERE timecardBreakupId=${timecardBreakupId}`;
 					let IQR = await db.query(IQ);
-					IQR.results.affectedRows > 0
-						? responseSender(res, `Comment Sent`)
-						: responseSender(res, `Error During Updating Comment`);
+					IQR.results.affectedRows > 0 ?
+						responseSender(res, `Comment Sent`) :
+						responseSender(res, `Error During Updating Comment`);
 				}
 			}
 		}
@@ -1499,9 +1488,9 @@ router.get('/comment/:id', auth, async (req, res) => {
                             WHERE timecardBreakupId = ${timecardBreakupId}`;
 			let sqlR = await db.query(sql);
 
-			sqlR.results.length > 0
-				? responseSender(res, JSON.parse(sqlR.results[0].managerComment))
-				: responseSender(res, `Wrong timecardBreakupId`);
+			sqlR.results.length > 0 ?
+				responseSender(res, JSON.parse(sqlR.results[0].managerComment)) :
+				responseSender(res, `Wrong timecardBreakupId`);
 		}
 	} catch (error) {
 		responseSender(res, error);
@@ -1529,9 +1518,9 @@ router.post('/timecard', auth, async (req, res) => {
                         WHERE timecard.timecardId =timecardDisputes.timecardId AND timecardDisputes.userID IN(${memberIds.toString()})AND timecardDisputes.status = 'open'`;
 
 					let tDQR = await db.query(tDQ);
-					tDQR.results.length < 1
-						? responseSender(res, 'No Open Disputes')
-						: res.send(tDQR.results);
+					tDQR.results.length < 1 ?
+						responseSender(res, 'No Open Disputes') :
+						res.send(tDQR.results);
 				} else {
 					responseSender(res, 'hierarchy either Direct or Full');
 				}
@@ -1560,8 +1549,9 @@ router.post('/timecard', auth, async (req, res) => {
 					}
 				}
 				st
-					? responseSender(res, 'Dispute Raised Successfully')
-					: responseSender(res, 'Error During Raising Dispute');
+					?
+					responseSender(res, 'Dispute Raised Successfully') :
+					responseSender(res, 'Error During Raising Dispute');
 			}
 		}
 		if (method === 'approval') {
@@ -1582,9 +1572,9 @@ router.post('/timecard', auth, async (req, res) => {
 						}
 					}
 					//TODO Update Daily Summary
-					if(st === true){
+					if (st === true) {
 						responseSender(res, 'Dispute Updated Successfully');
-					}else{
+					} else {
 						responseSender(res, 'Error During Updating Dispute');
 					}
 				}
@@ -1619,9 +1609,9 @@ router.post('/manualtimecard', auth, async (req, res) => {
                         WHERE manualTime.userID IN(${memberIds.toString()})AND manualTime.status = 'open'`;
 
 				let mtQR = await db.query(mtQ);
-				mtQR.results.length < 1
-					? responseSender(res, 'No Manual Timecards requested')
-					: res.send(mtQR.results);
+				mtQR.results.length < 1 ?
+					responseSender(res, 'No Manual Timecards requested') :
+					res.send(mtQR.results);
 			}
 		}
 		if (method === 'request') {
@@ -1635,8 +1625,9 @@ router.post('/manualtimecard', auth, async (req, res) => {
 					status: 'open',
 				});
 				r
-					? responseSender(res, 'Manual Timecard Requested Successfully')
-					: responseSender(res, 'Error During requesting Manula Timecard');
+					?
+					responseSender(res, 'Manual Timecard Requested Successfully') :
+					responseSender(res, 'Error During requesting Manula Timecard');
 			}
 		}
 		if (method === 'approval') {
@@ -1650,8 +1641,7 @@ router.post('/manualtimecard', auth, async (req, res) => {
 					for (let t = 0; t < manualtimecardIds.length; t++) {
 						let ud = await manualTimecardHandler(
 							'update',
-							manualtimecardIds[t],
-							{
+							manualtimecardIds[t], {
 								approverComments: comments,
 								status: status,
 							}
@@ -1661,8 +1651,9 @@ router.post('/manualtimecard', auth, async (req, res) => {
 						}
 					}
 					st
-						? responseSender(res, 'Manual Timecard Updated Successfully')
-						: responseSender(res, 'Error During Updating Manual Timecard');
+						?
+						responseSender(res, 'Manual Timecard Updated Successfully') :
+						responseSender(res, 'Error During Updating Manual Timecard');
 				}
 			}
 		}
@@ -1672,8 +1663,7 @@ router.post('/manualtimecard', auth, async (req, res) => {
 });
 
 router.post('/mytasks', auth, async (req, res) => {
-	try {
-	} catch (error) {
+	try {} catch (error) {
 		responseSender(res, error);
 	}
 });
@@ -1711,9 +1701,9 @@ router.post('/newcompany', auth, async (req, res) => {
             FROM company
             WHERE status ='active'`;
 			let cQR = await db.query(cQ);
-			cQR.results < 1
-				? responseSender(res, `No Company to List`)
-				: res.send(cQR.results);
+			cQR.results < 1 ?
+				responseSender(res, `No Company to List`) :
+				res.send(cQR.results);
 		}
 		if (method === 'add') {
 			res.send({
@@ -1727,9 +1717,9 @@ router.post('/newcompany', auth, async (req, res) => {
 			} else {
 				let uQ = `UPDATE company SET status ='Inactive' WHERE companyId=${compnayId}`;
 				let uQR = await db.query(uQ);
-				uQR.results.affectedRows === 1
-					? responseSender(res, `Updated`)
-					: responseSender(res, `Error During Update`);
+				uQR.results.affectedRows === 1 ?
+					responseSender(res, `Updated`) :
+					responseSender(res, `Error During Update`);
 			}
 		}
 	} catch (error) {
@@ -1738,15 +1728,13 @@ router.post('/newcompany', auth, async (req, res) => {
 });
 
 router.post('/teamhandler', auth, async (req, res) => {
-	try {
-	} catch (error) {
+	try {} catch (error) {
 		responseSender(res, error);
 	}
 });
 
 router.post('/userhandler', auth, async (req, res) => {
-	try {
-	} catch (error) {
+	try {} catch (error) {
 		responseSender(res, error);
 	}
 });
@@ -1764,7 +1752,9 @@ router.post('/cServerAuth', async (req, res) => {
     AND user.isActive = 1
     AND company.status = "active"`;
 	try {
-		let { results } = await db.query(sql, [companyname, username, username]);
+		let {
+			results
+		} = await db.query(sql, [companyname, username, username]);
 		if (Object.keys(results).length === 0) {
 			res.send({
 				auth: 0,
