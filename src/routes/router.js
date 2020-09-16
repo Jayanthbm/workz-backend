@@ -41,7 +41,7 @@ async function getManagerName(userId) {
 		}
 
 		return m[0];
-	} catch (e) {}
+	} catch (e) { }
 }
 
 //Company Info
@@ -70,7 +70,7 @@ async function getUserIdfromTeam(teamId) {
                 WHERE teamId =${teamId} AND isManager = 1`;
 		let UidR = await db.query(Uid);
 		return UidR.results;
-	} catch (e) {}
+	} catch (e) { }
 }
 
 //Get teams of the User
@@ -82,7 +82,7 @@ async function getTeams(userId) {
             WHERE managerId = ${userId}`;
 		let TQR = await db.query(TQ);
 		return TQR.results;
-	} catch (e) {}
+	} catch (e) { }
 }
 
 //Get Array Size
@@ -132,18 +132,18 @@ async function generate_dropdown(userId, isManager) {
 			}
 		}
 		return dp;
-	} catch (error) {}
+	} catch (error) { }
 }
 
 //Function to Create Token
 
 async function create_token(id, expiresIn) {
 	const token = jwt.sign({
-			userId: id,
-		},
+		userId: id,
+	},
 		CC.SECRET_KEY, {
-			expiresIn,
-		}
+		expiresIn,
+	}
 	);
 	return token;
 }
@@ -699,7 +699,7 @@ router.post('/login', async (req, res) => {
 											60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
 									},
 								},
-							}, ],
+							},],
 						});
 						const cookie = cloudFront.getSignedCookie({
 							policy,
@@ -710,10 +710,10 @@ router.post('/login', async (req, res) => {
 							res.cookie(
 								'CloudFront-Key-Pair-Id',
 								cookie['CloudFront-Key-Pair-Id'], {
-									domain,
-									path: '/',
-									httpOnly: true,
-								}
+								domain,
+								path: '/',
+								httpOnly: true,
+							}
 							);
 
 							res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
@@ -725,10 +725,10 @@ router.post('/login', async (req, res) => {
 							res.cookie(
 								'CloudFront-Signature',
 								cookie['CloudFront-Signature'], {
-									domain,
-									path: '/',
-									httpOnly: true,
-								}
+								domain,
+								path: '/',
+								httpOnly: true,
+							}
 							);
 							res.send({
 								token,
@@ -780,7 +780,7 @@ router.post('/refresh', auth, async (req, res) => {
 					'AWS:EpochTime': Math.floor(new Date().getTime() / 1000) + 60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
 				},
 			},
-		}, ],
+		},],
 	});
 	const cookie = cloudFront.getSignedCookie({
 		policy,
@@ -1352,9 +1352,8 @@ router.post('/zoom', auth, async (req, res) => {
                             YEAR(timeCardBreakup) = ${timecardYear} AND MONTH(timeCardBreakup) = ${timecardMonth} AND
                             DAY(timeCardBreakup) = ${timecardDay} AND HOUR(timeCardBreakup) = ${timecardHour} AND
                             MINUTE(timeCardBreakup)
-                            BETWEEN ${timecardMinute} AND ${
-					timecardMinute + comapanyInfo.timecardsize - 1
-				}
+                            BETWEEN ${timecardMinute} AND ${timecardMinute + comapanyInfo.timecardsize - 1
+					}
                             ORDER BY timeCardBreakup ASC`;
 				let tBQR = await db.query(tBQ);
 				let tB = tBQR.results;
@@ -1513,10 +1512,9 @@ router.post('/timecard', auth, async (req, res) => {
 				if (hierarchy === 'Direct' || hierarchy === 'Full') {
 					let memberIds = await getMemberIds(userId, hierarchy);
 					//Get list of timecardDisputes
-					let tDQ = `SELECT timecard.timecardId,timecardDisputes.disputeReason,timecard.timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl
-                        FROM timecardDisputes,timecard
-                        WHERE timecard.timecardId =timecardDisputes.timecardId AND timecardDisputes.userID IN(${memberIds.toString()})AND timecardDisputes.status = 'open'`;
-
+					let tDQ = `SELECT user.name,user.empId,timecard.timecardId,timecardDisputes.disputeReason,timecard.timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,CONCAT(user.userId, "/",DATE(timecard.timecard)) as timecardLink
+                        FROM timecardDisputes,timecard,user
+                        WHERE timecard.timecardId =timecardDisputes.timecardId AND timecardDisputes.userID IN(${memberIds.toString()})AND timecardDisputes.status = 'open' AND user.userId = timecard.userId`;
 					let tDQR = await db.query(tDQ);
 					tDQR.results.length < 1 ?
 						responseSender(res, 'No Open Disputes') :
@@ -1642,9 +1640,9 @@ router.post('/manualtimecard', auth, async (req, res) => {
 						let ud = await manualTimecardHandler(
 							'update',
 							manualtimecardIds[t], {
-								approverComments: comments,
-								status: status,
-							}
+							approverComments: comments,
+							status: status,
+						}
 						);
 						if (ud === false || ud === null) {
 							st = false;
@@ -1663,7 +1661,7 @@ router.post('/manualtimecard', auth, async (req, res) => {
 });
 
 router.post('/mytasks', auth, async (req, res) => {
-	try {} catch (error) {
+	try { } catch (error) {
 		responseSender(res, error);
 	}
 });
@@ -1728,13 +1726,13 @@ router.post('/newcompany', auth, async (req, res) => {
 });
 
 router.post('/teamhandler', auth, async (req, res) => {
-	try {} catch (error) {
+	try { } catch (error) {
 		responseSender(res, error);
 	}
 });
 
 router.post('/userhandler', auth, async (req, res) => {
-	try {} catch (error) {
+	try { } catch (error) {
 		responseSender(res, error);
 	}
 });
