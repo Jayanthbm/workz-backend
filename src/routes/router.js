@@ -1512,7 +1512,7 @@ router.post('/timecard', auth, async (req, res) => {
 				if (hierarchy === 'Direct' || hierarchy === 'Full') {
 					let memberIds = await getMemberIds(userId, hierarchy);
 					//Get list of timecardDisputes
-					let tDQ = `SELECT user.name,user.empId,timecard.timecardId,timecardDisputes.disputeReason,timecard.timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,CONCAT(user.userId, "/",DATE(timecard.timecard)) as timecardLink
+					let tDQ = `SELECT user.name,user.empId,timecard.timecardId,timecardDisputes.disputeReason,DATE_FORMAT(timecard.timecard,'%Y-%m-%d %H:%i') as timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,CONCAT(user.userId, "/",DATE(timecard.timecard)) as timecardLink
                         FROM timecardDisputes,timecard,user
                         WHERE timecard.timecardId =timecardDisputes.timecardId AND timecardDisputes.userID IN(${memberIds.toString()})AND timecardDisputes.status = 'open' AND user.userId = timecard.userId`;
 					let tDQR = await db.query(tDQ);
