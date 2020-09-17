@@ -538,6 +538,7 @@ async function checkAccess(authId, isManager, requestedId) {
 	}
 }
 
+//Function to Check TImecard Status
 async function checkTimecardStatus(timecardId) {
 	let fQ = `SELECT status
             FROM timecard
@@ -546,6 +547,7 @@ async function checkTimecardStatus(timecardId) {
 	return fQr.results[0].status;
 }
 
+//Function to Update Timecard Status
 async function updateTImecardStatus(timecardId, status) {
 	let FlagQuery = `UPDATE timecard set status='${status}'
                     WHERE timecardId=${timecardId}`;
@@ -597,6 +599,19 @@ async function getMemberIds(userId, type) {
 	}
 }
 
+//Function to Update Daily Summary
+async function updateDailySummary(userId, summaryDate, status) {
+	if (status === 'approved') {
+		let upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged ='',hoursFlagged='',hoursRejected=''
+		WHERE userId= ${userId} AND summaryDate ='${summaryDate}' `;
+	}
+	if (status === 'rejected') {
+		let upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged ='',hoursFlagged='',hoursRejected=''
+		WHERE userId= ${userId} AND summaryDate ='${summaryDate}' `;
+	}
+	let upadteDailySummaryQueryR = await db.query(upadteDailySummaryQuery);
+	return upadteDailySummaryQueryR.results.affectedRows === 1 ? true : false;
+}
 async function timecardDisputesHandler(method, timecardId, data) {
 	if (timecardId) {
 		if (method === 'add') {
@@ -606,8 +621,11 @@ async function timecardDisputesHandler(method, timecardId, data) {
 		}
 		if (method === 'update') {
 			let utQ = `UPDATE timecardDisputes SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE timecardId = ${timecardId}`;
-			let utQR = await db.query(utQ);
-			return utQR.results.affectedRows === 1 ? true : false;
+			if (updateTImecardStatus(timecardId, data.status)) {
+				let utQR = await db.query(utQ);
+				return utQR.results.affectedRows === 1 ? true : false;
+			}
+			return false;
 		}
 	} else {
 		return null;
@@ -1570,7 +1588,7 @@ router.post('/timecard', auth, async (req, res) => {
 						}
 					}
 					//TODO Update Daily Summary
-					if (st === true) {
+					if (st == true) {
 						responseSender(res, 'Dispute Updated Successfully');
 					} else {
 						responseSender(res, 'Error During Updating Dispute');
