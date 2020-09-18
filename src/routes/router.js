@@ -601,16 +601,25 @@ async function getMemberIds(userId, type) {
 
 //Function to Update Daily Summary
 async function updateDailySummary(userId, summaryDate, status) {
+	let upadteDailySummaryQuery;
 	if (status === 'approved') {
-		let upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged ='',hoursFlagged='',hoursRejected=''
+		upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2)
 		WHERE userId= ${userId} AND summaryDate ='${summaryDate}' `;
 	}
 	if (status === 'rejected') {
-		let upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged ='',hoursFlagged='',hoursRejected=''
+		upadteDailySummaryQuery = `UPDATE dailySummary set hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2),hoursRejected=TRUNCATE((((hoursRejected*60)+10)/60),2)
 		WHERE userId= ${userId} AND summaryDate ='${summaryDate}' `;
 	}
+	console.log(upadteDailySummaryQuery);
 	let upadteDailySummaryQueryR = await db.query(upadteDailySummaryQuery);
 	return upadteDailySummaryQueryR.results.affectedRows === 1 ? true : false;
+}
+
+//Function to get Timecard Details
+async function getTimecardDetails(timecardId) {
+	const sql = `SELECT timecard,userId,DATE(timecard) as Dtimecard
+							WHERE timecardId = ${timecardId}`;
+	return (await db.query(sql)).results[0];
 }
 async function timecardDisputesHandler(method, timecardId, data) {
 	if (timecardId) {
@@ -622,8 +631,11 @@ async function timecardDisputesHandler(method, timecardId, data) {
 		if (method === 'update') {
 			let utQ = `UPDATE timecardDisputes SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE timecardId = ${timecardId}`;
 			if (updateTImecardStatus(timecardId, data.status)) {
-				let utQR = await db.query(utQ);
-				return utQR.results.affectedRows === 1 ? true : false;
+				let timecardDetails = await getTimecardDetails(timecardId);
+				if (updateDailySummary(timecardDetails.userId, timecardDetails.Dtimecard, data.status)) {
+					let utQR = await db.query(utQ);
+					return utQR.results.affectedRows === 1 ? true : false;
+				}
 			}
 			return false;
 		}
