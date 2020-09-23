@@ -630,6 +630,11 @@ async function checkDuplicatetimecardDisputes(timecardId, userId) {
             FROM timecardDisputes
             WHERE timecardId=${timecardId} AND userId=${userId} AND status='open'`;
   let dQR = await db.query(dQ);
+  console.log(dQ);
+  console.log(`Timcard:${timecardId}`);
+  console.log(`User:${userId}`);
+  console.log(dQR.results);
+  console.log(dQR.results.length);
   if (dQR.results.length > 0) {
     return 0;
   } else {
