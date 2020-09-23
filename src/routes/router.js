@@ -625,12 +625,26 @@ async function getTimecardDetails(timecardId) {
   let sqlR = await db.query(sql);
   return sqlR.results[0];
 }
+async function checkDuplicatetimecardDisputes(timecardId, userId) {
+  let dQ = `SELECT timecardId,userId
+            FROM timecardDisputes
+            WHERE timecardId=${timecardId} AND userId=${userId}`;
+  let dQR = await db.query(dQ);
+  if (dQR.results.lenth > 0) {
+    return false;
+  } else {
+    return true;
+  }
+  console.log();
+}
 async function timecardDisputesHandler(method, timecardId, data) {
   if (timecardId) {
     if (method === "add") {
-      let itQ = `INSERT INTO timecardDisputes (timecardId,userId,disputeReason,status)VALUES(${timecardId},${data.userId},'${data.disputeReason}','${data.status}')`;
-      let itQR = await db.query(itQ);
-      return itQR.results.affectedRows === 1 ? true : false;
+      if (checkDuplicatetimecardDisputes(timecardId, data.userId)) {
+        let itQ = `INSERT INTO timecardDisputes (timecardId,userId,disputeReason,status)VALUES(${timecardId},${data.userId},'${data.disputeReason}','${data.status}')`;
+        let itQR = await db.query(itQ);
+        return itQR.results.affectedRows === 1 ? true : false;
+      }
     }
     if (method === "update") {
       let utQ = `UPDATE timecardDisputes SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE timecardId = ${timecardId}`;
