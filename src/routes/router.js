@@ -631,18 +631,21 @@ async function checkDuplicatetimecardDisputes(timecardId, userId) {
             WHERE timecardId=${timecardId} AND userId=${userId}`;
   let dQR = await db.query(dQ);
   if (dQR.results.length > 0) {
-    return false;
+    return 0;
   } else {
-    return true;
+    return 1;
   }
 }
 async function timecardDisputesHandler(method, timecardId, data) {
   if (timecardId) {
     if (method === "add") {
-      if (checkDuplicatetimecardDisputes(timecardId, data.userId)) {
+      if (checkDuplicatetimecardDisputes(timecardId, data.userId) === 1) {
+        console.log("Inserting Record");
         let itQ = `INSERT INTO timecardDisputes (timecardId,userId,disputeReason,status)VALUES(${timecardId},${data.userId},'${data.disputeReason}','${data.status}')`;
         let itQR = await db.query(itQ);
         return itQR.results.affectedRows === 1 ? true : false;
+      } else {
+        console.log("Record Exist");
       }
     }
     if (method === "update") {
