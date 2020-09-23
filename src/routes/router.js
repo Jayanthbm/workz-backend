@@ -635,10 +635,10 @@ async function checkDuplicatetimecardDisputes(timecardId, userId) {
   console.log(`User:${userId}`);
   console.log(dQR.results);
   console.log(dQR.results.length);
-  if (dQR.results.length > 0) {
-    return 0;
-  } else {
+  if (dQR.results.length === 0) {
     return 1;
+  } else {
+    return 0;
   }
 }
 async function timecardDisputesHandler(method, timecardId, data) {
