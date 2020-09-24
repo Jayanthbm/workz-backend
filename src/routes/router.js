@@ -628,24 +628,20 @@ async function getTimecardDetails(timecardId) {
 async function checkDuplicatetimecardDisputes(timecardId, userId) {
   let dQ = `SELECT timecardId,userId
             FROM timecardDisputes
-            WHERE timecardId=${timecardId} AND userId=${userId} AND status='open'`;
+            WHERE timecardId=${timecardId} AND userId=${userId} AND status='open'
+            LIMIT 1`;
   let dQR = await db.query(dQ);
-  console.log(dQ);
-  console.log(`Timcard:${timecardId}`);
-  console.log(`User:${userId}`);
-  console.log(dQR.results);
-  console.log(dQR.results.length);
-  if (dQR.results.length === 0) {
-    return 1;
-  } else {
+  if (dQR.results.length > 0) {
     return 0;
+  } else {
+    return 1;
   }
 }
 async function timecardDisputesHandler(method, timecardId, data) {
   if (timecardId) {
     if (method === "add") {
-      if (checkDuplicatetimecardDisputes(timecardId, data.userId) === 1) {
-        console.log("Inserting Record");
+      let cD = await checkDuplicatetimecardDisputes(timecardId, data.userId);
+      if (cD === 1) {
         let itQ = `INSERT INTO timecardDisputes (timecardId,userId,disputeReason,status)VALUES(${timecardId},${data.userId},'${data.disputeReason}','${data.status}')`;
         let itQR = await db.query(itQ);
         return itQR.results.affectedRows === 1 ? true : false;
