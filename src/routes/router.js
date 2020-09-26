@@ -601,17 +601,24 @@ async function getMemberIds(userId, type) {
     return null;
   }
 }
-
+function formatDate(date1) {
+  var date = new Date(date1);
+  var dateString = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
+  return dateString;
+}
 //Function to Update Daily Summary
 async function updateDailySummary(userId, summaryDate, status) {
+  let NsummaryDate = formatDate(summaryDate);
   let upadteDailySummaryQuery;
   if (status === "approved") {
     upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2)
-		WHERE userId= ${userId} AND summaryDate ='${summaryDate}' `;
+    WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
   }
   if (status === "rejected") {
     upadteDailySummaryQuery = `UPDATE dailySummary set hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2),hoursRejected=TRUNCATE((((hoursRejected*60)+10)/60),2)
-		WHERE userId= ${userId} AND summaryDate ='${summaryDate}' `;
+    WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
   }
   let upadteDailySummaryQueryR = await db.query(upadteDailySummaryQuery);
   return upadteDailySummaryQueryR.results.affectedRows === 1 ? true : false;
@@ -619,7 +626,7 @@ async function updateDailySummary(userId, summaryDate, status) {
 
 //Function to get Timecard Details
 async function getTimecardDetails(timecardId) {
-  const sql = `SELECT timecard,userId,DATE(timecard) as Dtimecard
+  const sql = `SELECT timecard,userId
               FROM timecard
               WHERE timecardId = ${timecardId}`;
   let sqlR = await db.query(sql);
@@ -656,7 +663,7 @@ async function timecardDisputesHandler(method, timecardId, data) {
         if (
           updateDailySummary(
             timecardDetails.userId,
-            timecardDetails.Dtimecard,
+            timecardDetails.timecard,
             data.status
           )
         ) {
