@@ -1732,6 +1732,26 @@ router.post("/manualtimecard", auth, async (req, res) => {
 
 router.post("/mytasks", auth, async (req, res) => {
   try {
+    let userId = req.userId;
+    let hierarchy = req.body.hierarchy || "Direct"; //Direct,Full
+    let userInfo = await getUserInfo(userId);
+    if (userInfo.isManager !== 1) {
+      responseSender(res, `You don't have access`);
+    } else {
+      let memberIds = await getMemberIds(userId, hierarchy);
+      let timeCardAproval = 0;
+      let ManualtimcardApproval = 0;
+      let TeamChanges = 0;
+      let userChanges = 0;
+      let userTeamtransfers = 0;
+      res.send({
+        timeCardAproval: timeCardAproval,
+        ManualtimcardApproval: ManualtimcardApproval,
+        TeamChanges: TeamChanges,
+        userChanges: userChanges,
+        userTeamtransfers: userTeamtransfers,
+      });
+    }
   } catch (error) {
     responseSender(res, error);
   }
