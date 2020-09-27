@@ -685,7 +685,7 @@ async function manualTimecardHandler(method, userId, data) {
       return imQR.results.affectedRows === 1 ? true : false;
     }
     if (method === "update") {
-      let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${data.manualTimeId}`;
+      let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${userId}`;
       let umQR = await db.query(umQ);
       return umQR.results.affectedRows === 1 ? true : false;
     }
