@@ -1795,6 +1795,7 @@ router.post("/newcompany", auth, async (req, res) => {
         : res.send(cQR.results);
     }
     if (method === "add") {
+      let nQ = `INSERT INTO company(name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy)VALUES('${name}','${fullName}','${address}','${city}','${state}')`;
       res.send({
         hello: "Coming Soon",
         message: req.body,
