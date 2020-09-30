@@ -658,7 +658,7 @@ async function timecardDisputesHandler(method, timecardId, data) {
     }
     if (method === "update") {
       let utQ = `UPDATE timecardDisputes SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE timecardId = ${timecardId}`;
-      if (updateTImecardStatus(timecardId, data.status)) {
+      if (await updateTImecardStatus(timecardId, data.status)) {
         let timecardDetails = await getTimecardDetails(timecardId);
         if (
           updateDailySummary(
