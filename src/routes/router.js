@@ -609,15 +609,15 @@ function formatDate(date1) {
   return dateString;
 }
 //Function to Update Daily Summary
-async function updateDailySummary(userId, summaryDate, status) {
+async function updateDailySummary(userId, summaryDate, status, amount = 10) {
   let NsummaryDate = formatDate(summaryDate);
   let upadteDailySummaryQuery;
   if (status === "approved") {
-    upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2)
+    upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-${amount})/60),2)
     WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
   }
   if (status === "rejected") {
-    upadteDailySummaryQuery = `UPDATE dailySummary set hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2),hoursRejected=TRUNCATE((((hoursRejected*60)+10)/60),2)
+    upadteDailySummaryQuery = `UPDATE dailySummary set hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2),hoursRejected=TRUNCATE((((hoursRejected*60)+${amount})/60),2)
     WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
   }
   let upadteDailySummaryQueryR = await db.query(upadteDailySummaryQuery);
@@ -678,13 +678,19 @@ async function timecardDisputesHandler(method, timecardId, data) {
   }
 }
 async function manualTimecardHandler(method, userId, data) {
+  let sT = `${data.date} ${data.startTime}`;
+  let eT = `${data.date} ${data.endTime}`;
   if (userId) {
     if (method === "add") {
-      let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${userId},'${data.startTime}','${data.endTime}','${data.reason}','${data.status}')`;
+      let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${userId},'${sT}','${eT}','${data.reason}','${data.status}')`;
       let imQR = await db.query(imQ);
       return imQR.results.affectedRows === 1 ? true : false;
     }
     if (method === "update") {
+      if (data.status === "approved") {
+        let diffInMins = Math.abs(new Date(eT) - new Date(sT)) / 60000;
+        await updateDailySummary(userId, data.date, "approved", diffInMins);
+      }
       let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${userId}`;
       let umQR = await db.query(umQ);
       return umQR.results.affectedRows === 1 ? true : false;
@@ -1688,8 +1694,9 @@ router.post("/manualtimecard", auth, async (req, res) => {
         responseSender(res, `Missing Fields`);
       } else {
         let r = await manualTimecardHandler("add", userId, {
+          date: date,
           startTime: startTime,
-          endTime: EndTime,
+          endTime: endTime,
           reason: reason,
           status: "open",
         });
@@ -1762,27 +1769,28 @@ router.post("/newcompany", auth, async (req, res) => {
     let method = req.body.method || "list"; // list,add,delete
     let compnayId = req.body.compnayId;
     //Data for Adding New Compnay
-    let name = req.body.name;
-    let fullName = req.body.fullName;
-    let address = req.body.address;
-    let city = req.body.city;
-    let state = req.body.state;
-    let pincode = req.body.pincode;
-    let country = req.body.country;
+    let name = req.body.name; //string
+    let fullName = req.body.fullName; //string
+    let address = req.body.address; //Text area
+    let city = req.body.city; //string
+    let state = req.body.state; //string
+    let pincode = req.body.pincode; //number
+    let country = req.body.country; //string
     let billingPlan = req.body.billingPlan;
     let billingRate = req.body.billingRate;
-    let billingCurrency = req.body.billingCurrency;
-    let timecardsize = req.body.timecardsize;
-    let timecardbreakupsize = req.body.timecardbreakupsize;
-    let enablewebcam = req.body.enablewebcam;
-    let enablescreenshot = req.body.enablescreenshot;
-    let mousePerTC = req.body.mousePerTC;
-    let keysPerTC = req.body.keysPerTC;
-    let IntDiscard = req.body.IntDiscard;
-    let intRed = req.body.intRed;
-    let intYellow = req.body.intYellow;
-    let termsConditions = req.body.termsConditions;
-    let updated = req.body.updated;
+    let billingCurrency = req.body.billingCurrency; //Currnecy lik e INR
+    let status = req.body.status || "active"; //don't send
+    let timecardsize = req.body.timecardsize; //integer
+    let timecardbreakupsize = req.body.timecardbreakupsize; //integer
+    let enablewebcam = req.body.enablewebcam; // yes or no if yes 1 or 0
+    let enablescreenshot = req.body.enablescreenshot; // yes or no if yes 1 or 0
+    let mousePerTC = req.body.mousePerTC; //integer
+    let keysPerTC = req.body.keysPerTC; //integer
+    let IntDiscard = req.body.IntDiscard; //number allow decimal
+    let intRed = req.body.intRed; //number allow decimal
+    let intYellow = req.body.intYellow; //number allow decimal
+    let termsConditions = req.body.termsConditions; //long text area
+    let updated = req.body.updated; //date time
     let updatedBy = req.body.updatedBy;
     //TODO check access
     if (method === "list") {
@@ -1795,11 +1803,12 @@ router.post("/newcompany", auth, async (req, res) => {
         : res.send(cQR.results);
     }
     if (method === "add") {
-      let nQ = `INSERT INTO company(name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy)VALUES('${name}','${fullName}','${address}','${city}','${state}')`;
-      res.send({
-        hello: "Coming Soon",
-        message: req.body,
-      });
+      let nQ = `INSERT INTO company(name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy)VALUES('${name}','${fullName}','${address}','${city}','${state}','${pincode}','${country}','${billingPlan}','${billingRate}','${billingCurrency}','${status}',${timecardsize},${timecardbreakupsize},${enablewebcam},${enablescreenshot},${mousePerTC},${keysPerTC},'${IntDiscard}','${intRed}','${intYellow}','${termsConditions}','${updated}','${updatedBy}')`;
+
+      let nQR = await db.query(nQ);
+      nQR.results.affectedRows === 1
+        ? responseSender(res, `Company Added`)
+        : responseSender(res, `Error Try Agian`);
     }
     if (method === "delete") {
       if (!compnayId) {
@@ -1808,7 +1817,7 @@ router.post("/newcompany", auth, async (req, res) => {
         let uQ = `UPDATE company SET status ='Inactive' WHERE companyId=${compnayId}`;
         let uQR = await db.query(uQ);
         uQR.results.affectedRows === 1
-          ? responseSender(res, `Updated`)
+          ? responseSender(res, `Company Deleted`)
           : responseSender(res, `Error During Update`);
       }
     }
