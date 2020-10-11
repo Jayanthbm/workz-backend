@@ -16,6 +16,11 @@ const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
 //constants
 
 const domain = "localhost";
+const roles = [];
+roles[1] = "Super Admin";
+roles[2] = "Admin";
+roles[3] = "Manager";
+roles[4] = "IC";
 //Functions
 
 //Get Name from UserId
@@ -55,7 +60,7 @@ async function getCompanyInfo(companyId) {
 }
 //UserInfo
 async function getUserInfo(userId) {
-  const uQ = `SELECT userId,companyId,empId,emailId,teamId,managerId,name,firstname,isManager,isActive
+  const uQ = `SELECT userId,companyId,empId,emailId,teamId,managerId,name,firstname,isManager,roleId,isActive
                 FROM user
                 WHERE userId =${userId}`;
   let uQR = await db.query(uQ);
@@ -699,6 +704,37 @@ async function manualTimecardHandler(method, userId, data) {
     return null;
   }
 }
+
+function accessChecker(roleId, task) {
+  // Super Admin,Admin,Manager,IC
+  let roleName = roles[roleId];
+  if (roleName === "Super Admin") {
+    return true;
+  } else {
+    if (task === "TimeCard") {
+      if (roleName === "Admin" || roleName === "Manager") {
+        return true;
+      } else {
+        return false;
+      }
+    }
+    if (task === "Manual TimeCard") {
+      if (roleName === "Admin" || roleName === "Manager") {
+        return true;
+      } else {
+        return false;
+      }
+    }
+    if (task === "Company") {
+      // if (roleName === "Admin"){
+      //   return true;
+      // }else{
+      //   return false;
+      // }
+      return true;
+    }
+  }
+}
 //Routes
 //TODO remove route during production
 
@@ -740,7 +776,7 @@ router.post("/login", async (req, res) => {
     if (!companyname && !username && !password) {
       responseSender(res, `Invalid Credentials`);
     } else {
-      let loginQuery = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') AND  user.isActive =1 AND company.status='active'`;
+      let loginQuery = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.roleId,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') AND  user.isActive =1 AND company.status='active'`;
       let loginResults = await db.query(loginQuery);
       let results = loginResults.results;
       if (results.length < 1) {
@@ -755,6 +791,8 @@ router.post("/login", async (req, res) => {
         let profilePic = results[0].profilePic;
         let profileThumbnailUrl = results[0].profileThumbnailUrl;
         let isManager = results[0].isManager;
+        let roleId = results[0].roleId;
+        let roleName = roles[roleId];
         let previousPassword = results[0].previousPassword;
         bcrypt.compare(password, haspass, async function (err, result) {
           if (err) {
@@ -811,6 +849,8 @@ router.post("/login", async (req, res) => {
                 teamId,
                 userId: id,
                 isManager,
+                roleId,
+                roleName,
                 dropdown: dp,
                 email,
                 firstname,
@@ -1585,7 +1625,7 @@ router.post("/timecard", auth, async (req, res) => {
     let status = req.body.status; // approved,rejected
     let userInfo = await getUserInfo(userId);
     if (method === "list") {
-      if (userInfo.isManager !== 1) {
+      if (!accessChecker(userInfo.roleId, "TimeCard")) {
         responseSender(res, `You Don't have access`);
       } else {
         if (hierarchy === "Direct" || hierarchy === "Full") {
@@ -1611,28 +1651,32 @@ router.post("/timecard", auth, async (req, res) => {
       }
     }
     if (method === "request") {
-      if (!timecardIds) {
-        responseSender(res, "No timecard Specified");
-      } else {
-        let st = true;
-        for (let t = 0; t < timecardIds.length; t++) {
-          let id = await timecardDisputesHandler("add", timecardIds[t], {
-            userId,
-            disputeReason: comments,
-            status: "open",
-          });
-          if (id === false || id === null) {
-            st = false;
+      if (userInfo.userId === userId) {
+        if (!timecardIds) {
+          responseSender(res, "No timecard Specified");
+        } else {
+          let st = true;
+          for (let t = 0; t < timecardIds.length; t++) {
+            let id = await timecardDisputesHandler("add", timecardIds[t], {
+              userId,
+              disputeReason: comments,
+              status: "open",
+            });
+            if (id === false || id === null) {
+              st = false;
+            }
           }
+          st
+            ? responseSender(res, "Dispute Raised Successfully")
+            : responseSender(res, "Error During Raising Dispute");
         }
-        st
-          ? responseSender(res, "Dispute Raised Successfully")
-          : responseSender(res, "Error During Raising Dispute");
+      } else {
+        responseSender(res, `You Don't have access`);
       }
     }
     if (method === "approval") {
-      if (userInfo.isManager !== 1) {
-        responseSender(res, `You don't have access`);
+      if (!accessChecker(userInfo.roleId, "TimeCard")) {
+        responseSender(res, `You Don't have access`);
       } else {
         if (!timecardIds) {
           responseSender(res, "No timecard Specified");
@@ -1674,8 +1718,8 @@ router.post("/manualtimecard", auth, async (req, res) => {
     let status = req.body.status;
     let userInfo = await getUserInfo(userId);
     if (method === "list") {
-      if (userInfo.isManager !== 1) {
-        responseSender(res, `You don't have access`);
+      if (!accessChecker(userInfo.roleId, "Manual TimeCard")) {
+        responseSender(res, `You Don't have access`);
       } else {
         let memberIds = await getMemberIds(userId, hierarchy);
         //Get list of ManualTimecards
@@ -1690,24 +1734,29 @@ router.post("/manualtimecard", auth, async (req, res) => {
       }
     }
     if (method === "request") {
-      if (!(date && startTime && EndTime && reason)) {
-        responseSender(res, `Missing Fields`);
+      if (userInfo.userId === userId) {
+        if (!(date && startTime && EndTime && reason)) {
+          responseSender(res, `Missing Fields`);
+        } else {
+          let r = await manualTimecardHandler("add", userId, {
+            date: date,
+            startTime: startTime,
+            endTime: endTime,
+            reason: reason,
+            status: "open",
+          });
+          //TODO Checks before Accepting Manual Timecards
+          r
+            ? responseSender(res, "Manual Timecard Requested Successfully")
+            : responseSender(res, "Error During requesting Manula Timecard");
+        }
       } else {
-        let r = await manualTimecardHandler("add", userId, {
-          date: date,
-          startTime: startTime,
-          endTime: endTime,
-          reason: reason,
-          status: "open",
-        });
-        r
-          ? responseSender(res, "Manual Timecard Requested Successfully")
-          : responseSender(res, "Error During requesting Manula Timecard");
+        responseSender(res, `You Don't have access`);
       }
     }
     if (method === "approval") {
-      if (userInfo.isManager !== 1) {
-        responseSender(res, `You don't have access`);
+      if (!accessChecker(userInfo.roleId, "Manual TimeCard")) {
+        responseSender(res, `You Don't have access`);
       } else {
         if (!manualtimecardIds) {
           responseSender(res, "No Id Specified");
@@ -1722,6 +1771,7 @@ router.post("/manualtimecard", auth, async (req, res) => {
                 status: status,
               }
             );
+            //TODO Checks before Approving Manual Timecards
             if (ud === false || ud === null) {
               st = false;
             }
@@ -1766,6 +1816,7 @@ router.post("/mytasks", auth, async (req, res) => {
 
 router.post("/newcompany", auth, async (req, res) => {
   try {
+    let userId = req.userId;
     let method = req.body.method || "list"; // list,add,delete
     let compnayId = req.body.compnayId;
     //Data for Adding New Compnay
@@ -1792,33 +1843,37 @@ router.post("/newcompany", auth, async (req, res) => {
     let termsConditions = req.body.termsConditions; //long text area
     let updated = req.body.updated; //date time
     let updatedBy = req.body.updatedBy;
-    //TODO check access
-    if (method === "list") {
-      let cQ = `SELECT name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy
+    let userInfo = await getUserInfo(userId);
+    if (!accessChecker(userInfo.roleId, "Company")) {
+      responseSender(res, `You Don't have access`);
+    } else {
+      if (method === "list") {
+        let cQ = `SELECT name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy
             FROM company
             WHERE status ='active'`;
-      let cQR = await db.query(cQ);
-      cQR.results < 1
-        ? responseSender(res, `No Company to List`)
-        : res.send(cQR.results);
-    }
-    if (method === "add") {
-      let nQ = `INSERT INTO company(name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy)VALUES('${name}','${fullName}','${address}','${city}','${state}','${pincode}','${country}','${billingPlan}','${billingRate}','${billingCurrency}','${status}',${timecardsize},${timecardbreakupsize},${enablewebcam},${enablescreenshot},${mousePerTC},${keysPerTC},'${IntDiscard}','${intRed}','${intYellow}','${termsConditions}','${updated}','${updatedBy}')`;
+        let cQR = await db.query(cQ);
+        cQR.results < 1
+          ? responseSender(res, `No Company to List`)
+          : res.send(cQR.results);
+      }
+      if (method === "add") {
+        let nQ = `INSERT INTO company(name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy)VALUES('${name}','${fullName}','${address}','${city}','${state}','${pincode}','${country}','${billingPlan}','${billingRate}','${billingCurrency}','${status}',${timecardsize},${timecardbreakupsize},${enablewebcam},${enablescreenshot},${mousePerTC},${keysPerTC},'${IntDiscard}','${intRed}','${intYellow}','${termsConditions}','${updated}','${updatedBy}')`;
 
-      let nQR = await db.query(nQ);
-      nQR.results.affectedRows === 1
-        ? responseSender(res, `Company Added`)
-        : responseSender(res, `Error Try Agian`);
-    }
-    if (method === "delete") {
-      if (!compnayId) {
-        responseSender(res, `No CompanyId`);
-      } else {
-        let uQ = `UPDATE company SET status ='Inactive' WHERE companyId=${compnayId}`;
-        let uQR = await db.query(uQ);
-        uQR.results.affectedRows === 1
-          ? responseSender(res, `Company Deleted`)
-          : responseSender(res, `Error During Update`);
+        let nQR = await db.query(nQ);
+        nQR.results.affectedRows === 1
+          ? responseSender(res, `Company Added`)
+          : responseSender(res, `Error Try Agian`);
+      }
+      if (method === "delete") {
+        if (!compnayId) {
+          responseSender(res, `No CompanyId`);
+        } else {
+          let uQ = `UPDATE company SET status ='Inactive' WHERE companyId=${compnayId}`;
+          let uQR = await db.query(uQ);
+          uQR.results.affectedRows === 1
+            ? responseSender(res, `Company Deleted`)
+            : responseSender(res, `Error During Update`);
+        }
       }
     }
   } catch (error) {
