@@ -682,21 +682,36 @@ async function timecardDisputesHandler(method, timecardId, data) {
     return null;
   }
 }
-async function manualTimecardHandler(method, userId, data) {
+
+async function manualTimeCardDetails(manualTimecardId){
+  let mQ = `SELECT userId,DATE(startTime) as date ,TIME(startTime) as startTime,TIME(endTime) as    endTime,manualTimeReason,approverComments,status
+FROM manualTime
+WHERE manualTimeId=${manualTimecardId}`;
+  let mQR = await db.query(mQ);
+  return mQR.results[0];
+}
+async function manualTimecardHandler(method, Id, data) {
   let sT = `${data.date} ${data.startTime}`;
   let eT = `${data.date} ${data.endTime}`;
-  if (userId) {
+  if (Id) {
     if (method === "add") {
-      let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${userId},'${sT}','${eT}','${data.reason}','${data.status}')`;
+      let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${Id},'${sT}','${eT}','${data.reason}','${data.status}')`;
       let imQR = await db.query(imQ);
       return imQR.results.affectedRows === 1 ? true : false;
     }
     if (method === "update") {
       if (data.status === "approved") {
         let diffInMins = Math.abs(new Date(eT) - new Date(sT)) / 60000;
-        await updateDailySummary(userId, data.date, "approved", diffInMins);
+        let manualTimecardDetails  = await manualTimeCardDetails(Id);
+        let check = await checkTimecardExits(manualTimecardDetails.date,manualTimecardDetails.startTime,manualTimecardDetails.endTime,manualTimecardDetails.userId);
+        if(check === true){
+          return false;
+        }else{
+          //TODO Update timecardtable
+          await updateDailySummary(Id, data.date, "approved", diffInMins);
+        }
       }
-      let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${userId}`;
+      let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
       let umQR = await db.query(umQ);
       return umQR.results.affectedRows === 1 ? true : false;
     }
@@ -733,6 +748,20 @@ function accessChecker(roleId, task) {
       // }
       return true;
     }
+  }
+}
+
+async function checkTimecardExits(date, startTime, EndTime, userId) {
+  startTime = startTime + ':00';
+  EndTime = EndTime + ':00';
+  let timeCardQ = `SELECT timecardId
+                  FROM timecard
+                  WHERE userId =${userId} AND DATE(timecard) = '${date}' AND TIME(timecard) BETWEEN '${startTime}' AND '${EndTime}' `;
+  let timeCardQR = await db.query(timeCardQ);
+  if (timeCardQR.results.length > 0) {
+    return true;
+  } else {
+    return false;
   }
 }
 //Routes
@@ -1738,17 +1767,28 @@ router.post("/manualtimecard", auth, async (req, res) => {
         if (!(date && startTime && EndTime && reason)) {
           responseSender(res, `Missing Fields`);
         } else {
-          let r = await manualTimecardHandler("add", userId, {
-            date: date,
-            startTime: startTime,
-            endTime: endTime,
-            reason: reason,
-            status: "open",
-          });
-          //TODO Checks before Accepting Manual Timecards
-          r
-            ? responseSender(res, "Manual Timecard Requested Successfully")
-            : responseSender(res, "Error During requesting Manula Timecard");
+          let check = await checkTimecardExits(
+            date,
+            startTime,
+            EndTime,
+            userId
+          );
+          if (check === true) {
+            responseSender(res, "Timecard Already Exits")
+          } else {
+              let r = await manualTimecardHandler("add", userId, {
+                date: date,
+                startTime: startTime,
+                endTime: EndTime,
+                reason: reason,
+                status: "open",
+            });
+            if(r){
+              responseSender(res, "Manual Timecard Requested Successfully");
+            }else{
+              responseSender(res, "Error During requesting Manula Timecard");
+            }
+          }
         }
       } else {
         responseSender(res, `You Don't have access`);
