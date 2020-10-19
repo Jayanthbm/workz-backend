@@ -1,26 +1,26 @@
-const express = require("express");
-const db = require("../models/db");
+const express = require('express');
+const db = require('../models/db');
 const router = express.Router();
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const CC = require("../constants");
-const nodemailer = require("nodemailer");
-const AWS = require("aws-sdk");
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const CC = require('../constants');
+const nodemailer = require('nodemailer');
+const AWS = require('aws-sdk');
 
 //Middlewares
-const auth = require("../middlewares/auth");
+const auth = require('../middlewares/auth');
 
 //AWS
 const cloudFront = new AWS.CloudFront.Signer(CC.cfpublickey, CC.cfprivateKey);
 
 //constants
 
-const domain = "localhost";
+const domain = 'localhost';
 const roles = [];
-roles[1] = "Super Admin";
-roles[2] = "Admin";
-roles[3] = "Manager";
-roles[4] = "IC";
+roles[1] = 'Super Admin';
+roles[2] = 'Admin';
+roles[3] = 'Manager';
+roles[4] = 'IC';
 //Functions
 
 //Get Name from UserId
@@ -114,7 +114,7 @@ async function generate_dropdown(userId, isManager) {
         let T = await getTeams(userId);
         let mn = await getManagerName(userId);
         dp[getarraysize(dp)] = mn;
-        dp[getarraysize(dp) - 1]["teams"] = T;
+        dp[getarraysize(dp) - 1]['teams'] = T;
         for (let i = 0; i < T.length; i++) {
           let uid = await getUserIdfromTeam(T[i].teamId);
           if (uid) {
@@ -161,9 +161,9 @@ async function validate_token(token) {
   let r;
   jwt.verify(token, CC.SECRET_KEY, async (err) => {
     if (err) {
-      r = "Invalid";
+      r = 'Invalid';
     } else {
-      r = "Valid";
+      r = 'Valid';
     }
   });
   return r;
@@ -324,10 +324,10 @@ function teams_splitter(resl) {
 //Function to Convert to date to Iso
 
 function toISOLocal(d) {
-  var z = (n) => ("0" + n).slice(-2);
-  var zz = (n) => ("00" + n).slice(-3);
+  var z = (n) => ('0' + n).slice(-2);
+  var zz = (n) => ('00' + n).slice(-3);
   var off = d.getTimezoneOffset();
-  var sign = off < 0 ? "+" : "-";
+  var sign = off < 0 ? '+' : '-';
   off = Math.abs(off);
 
   return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(
@@ -368,9 +368,9 @@ function groupBy(arr, key) {
 
 async function getTeamMembers(teamId) {
   let tid;
-  if (typeof teamId === "object") {
+  if (typeof teamId === 'object') {
     teamId.forEach((element) => {
-      if (typeof tid === "undefined") {
+      if (typeof tid === 'undefined') {
         tid = element.teamId;
       } else {
         tid = `${tid},${element.teamId}`;
@@ -399,7 +399,7 @@ function getDates(startDate, stopDate) {
     return dat;
   };
   while (currentDate <= stopDate) {
-    dateArray.push(toISOLocal(currentDate).split("T")[0]);
+    dateArray.push(toISOLocal(currentDate).split('T')[0]);
     currentDate = currentDate.addDays(1);
   }
   return dateArray;
@@ -415,7 +415,7 @@ function focusSetter(focus, timecardbreakupsize, timecardsize) {
 
 function formatTime(timeString) {
   let t = timeString[0] + timeString[1];
-  if (t === "12") {
+  if (t === '12') {
     return `${timeString} PM`;
   }
   if (t < 12) {
@@ -430,7 +430,7 @@ function formatTime(timeString) {
 }
 
 function DT(date) {
-  let nd = toISOLocal(date).split("T");
+  let nd = toISOLocal(date).split('T');
   let d = nd[0];
   let t = nd[1].slice(0, -13);
   let nt = formatTime(t);
@@ -573,7 +573,7 @@ async function getMemberIds(userId, type) {
   let userInfo = await getUserInfo(userId);
   let memberIds = [];
   if (userInfo.isManager === 1) {
-    if (type === "Direct") {
+    if (type === 'Direct') {
       let teamIds = await getTeams(userId);
       for (let i = 0; i < teamIds.length; i++) {
         let members = await getTeamMembers(teamIds[i].teamId);
@@ -582,7 +582,7 @@ async function getMemberIds(userId, type) {
         }
       }
     }
-    if (type === "Full") {
+    if (type === 'Full') {
       let teamIds = await getTeams(userId);
       for (let i = 0; i < teamIds.length; i++) {
         let members = await getTeamMembers(teamIds[i].teamId);
@@ -610,18 +610,18 @@ function formatDate(date1) {
   var date = new Date(date1);
   var dateString = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
     .toISOString()
-    .split("T")[0];
+    .split('T')[0];
   return dateString;
 }
 //Function to Update Daily Summary
 async function updateDailySummary(userId, summaryDate, status, amount = 10) {
   let NsummaryDate = formatDate(summaryDate);
   let upadteDailySummaryQuery;
-  if (status === "approved") {
+  if (status === 'approved') {
     upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-${amount})/60),2)
     WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
   }
-  if (status === "rejected") {
+  if (status === 'rejected') {
     upadteDailySummaryQuery = `UPDATE dailySummary set hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2),hoursRejected=TRUNCATE((((hoursRejected*60)+${amount})/60),2)
     WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
   }
@@ -651,17 +651,16 @@ async function checkDuplicatetimecardDisputes(timecardId, userId) {
 }
 async function timecardDisputesHandler(method, timecardId, data) {
   if (timecardId) {
-    if (method === "add") {
+    if (method === 'add') {
       let cD = await checkDuplicatetimecardDisputes(timecardId, data.userId);
       if (cD === 1) {
         let itQ = `INSERT INTO timecardDisputes (timecardId,userId,disputeReason,status)VALUES(${timecardId},${data.userId},'${data.disputeReason}','${data.status}')`;
         let itQR = await db.query(itQ);
         return itQR.results.affectedRows === 1 ? true : false;
       } else {
-        console.log("Record Exist");
       }
     }
-    if (method === "update") {
+    if (method === 'update') {
       let utQ = `UPDATE timecardDisputes SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE timecardId = ${timecardId}`;
       if (await updateTImecardStatus(timecardId, data.status)) {
         let timecardDetails = await getTimecardDetails(timecardId);
@@ -683,64 +682,144 @@ async function timecardDisputesHandler(method, timecardId, data) {
   }
 }
 
-async function manualTimeCardDetails(manualTimecardId){
-  let mQ = `SELECT userId,DATE(startTime) as date ,TIME(startTime) as startTime,TIME(endTime) as    endTime,manualTimeReason,approverComments,status
+async function manualTimeCardDetails(manualTimecardId) {
+  let mQ = `SELECT userId,CONCAT('',DATE(startTime),'') as date ,TIME(startTime) as startTime,TIME(endTime) as    endTime,manualTimeReason,approverComments,status
 FROM manualTime
 WHERE manualTimeId=${manualTimecardId}`;
   let mQR = await db.query(mQ);
   return mQR.results[0];
 }
-async function manualTimecardHandler(method, Id, data) {
+
+function addMinutes(time, minutes) {
+  let hour = parseInt(time[0] + time[1]);
+  let min = parseInt(time[3] + time[4]);
+
+  if (min + 10 >= 60) {
+    hour += 1;
+    min = '00';
+  } else {
+    min += 10;
+  }
+  return `${hour}:${min}:00`;
+}
+function checkTime(stime, etime) {
+  let shour = parseInt(stime[0] + stime[1]);
+  let smin = parseInt(stime[3] + stime[4]);
+  let ehour = parseInt(etime[0] + etime[1]);
+  let emin = parseInt(etime[3] + etime[4]);
+  if (shour > ehour) {
+    return false;
+  } else {
+    if (shour === ehour) {
+      if (smin >= emin) {
+        return false;
+      } else {
+        return true;
+      }
+    } else {
+      return true;
+    }
+  }
+}
+async function addTimecard(userId, approver, timecard) {
+  let Itq = `INSERT INTO timecard(
+    timecard,userId,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,approvedBy,focus,intensityScore,created
+  )VALUES(
+    '${timecard}',${userId},0,0,0,'Manual Timecard','Manual Timecard',NULL,NULL,NULL,'approved','${approver}',0,0,current_timestamp()
+  )`;
+  let ItqR = await db.query(Itq);
+  return ItqR.results.affectedRows === 1 ? true : false;
+}
+async function newTimecard(date, startTime, endTime, userId, approver) {
+  let times = [];
+  times.push(startTime);
+  try {
+    let checker = true;
+    while (checker) {
+      let r = addMinutes(times[times.length - 1], 10);
+      times.push(r);
+      checker = checkTime(times[times.length - 1], endTime);
+    }
+  } catch (error) {
+    console.log(error);
+  }
+  times.shift();
+  for (let i = 0; i < times.length; i++) {
+    await addTimecard(userId, approver, `${date} ${times[i]}`);
+  }
+  return true;
+}
+async function manualTimecardHandler(method, Id, data, approver) {
   let sT = `${data.date} ${data.startTime}`;
   let eT = `${data.date} ${data.endTime}`;
   if (Id) {
-    if (method === "add") {
+    if (method === 'add') {
       let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${Id},'${sT}','${eT}','${data.reason}','${data.status}')`;
       let imQR = await db.query(imQ);
       return imQR.results.affectedRows === 1 ? true : false;
     }
-    if (method === "update") {
-      if (data.status === "approved") {
+    if (method === 'update') {
+      if (data.status === 'approved') {
         let diffInMins = Math.abs(new Date(eT) - new Date(sT)) / 60000;
-        let manualTimecardDetails  = await manualTimeCardDetails(Id);
-        let check = await checkTimecardExits(manualTimecardDetails.date,manualTimecardDetails.startTime,manualTimecardDetails.endTime,manualTimecardDetails.userId);
-        if(check === true){
-          return false;
-        }else{
+        let manualTimecardDetails = await manualTimeCardDetails(Id);
+        let check = await checkTimecardExists(
+          manualTimecardDetails.date,
+          manualTimecardDetails.startTime,
+          manualTimecardDetails.endTime,
+          manualTimecardDetails.userId
+        );
+        if (check === true) {
+          return 'Timecard Exits';
+        } else {
           //TODO Update timecardtable
-          await updateDailySummary(Id, data.date, "approved", diffInMins);
+          await newTimecard(
+            manualTimecardDetails.date,
+            manualTimecardDetails.startTime,
+            manualTimecardDetails.endTime,
+            manualTimecardDetails.userId,
+            approver
+          );
+          return 'Addding Timecard Data';
+          // await updateDailySummary(Id, data.date, "approved", diffInMins);
         }
       }
-      let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
-      let umQR = await db.query(umQ);
-      return umQR.results.affectedRows === 1 ? true : false;
+      if (data.status === 'rejected') {
+        let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
+        let umQR = await db.query(umQ);
+        return umQR.results.affectedRows === 1
+          ? 'Manual TimeCard Successfully Rejected '
+          : 'Error During Rejection';
+      }
+      // let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
+      // let umQR = await db.query(umQ);
+      // return umQR.results.affectedRows === 1 ? true : false;
     }
   } else {
-    return null;
+    return 'Error';
   }
 }
 
 function accessChecker(roleId, task) {
   // Super Admin,Admin,Manager,IC
   let roleName = roles[roleId];
-  if (roleName === "Super Admin") {
+  if (roleName === 'Super Admin') {
     return true;
   } else {
-    if (task === "TimeCard") {
-      if (roleName === "Admin" || roleName === "Manager") {
+    if (task === 'TimeCard') {
+      if (roleName === 'Admin' || roleName === 'Manager') {
         return true;
       } else {
         return false;
       }
     }
-    if (task === "Manual TimeCard") {
-      if (roleName === "Admin" || roleName === "Manager") {
+    if (task === 'Manual TimeCard') {
+      if (roleName === 'Admin' || roleName === 'Manager') {
         return true;
       } else {
         return false;
       }
     }
-    if (task === "Company") {
+    if (task === 'Company') {
       // if (roleName === "Admin"){
       //   return true;
       // }else{
@@ -751,7 +830,7 @@ function accessChecker(roleId, task) {
   }
 }
 
-async function checkTimecardExits(date, startTime, EndTime, userId) {
+async function checkTimecardExists(date, startTime, EndTime, userId) {
   startTime = startTime + ':00';
   EndTime = EndTime + ':00';
   let timeCardQ = `SELECT timecardId
@@ -764,16 +843,17 @@ async function checkTimecardExits(date, startTime, EndTime, userId) {
     return false;
   }
 }
+
 //Routes
 //TODO remove route during production
 
-router.get("/", async (req, res) => {
+router.get('/', async (req, res) => {
   responseSender(res, `Hello world`);
 });
 
 //Form Submission End point Support and Demo Forms
 
-router.post("/submitform", async (req, res) => {
+router.post('/submitform', async (req, res) => {
   try {
     let name = req.body.name;
     let companyName = req.body.companyName;
@@ -781,7 +861,7 @@ router.post("/submitform", async (req, res) => {
     let email = req.body.email;
     let description = req.body.description;
     let typeRequest = req.body.typeRequest;
-    if (!(typeRequest === "Demo" || typeRequest === "Support")) {
+    if (!(typeRequest === 'Demo' || typeRequest === 'Support')) {
       responseSender(res, `Missing Data`);
     } else {
       let fI = `INSERT INTO queryForms(name,companyName,phone,email,description,typeRequest)VALUES('${name}','${companyName}','${phone}','${email}','${description}','${typeRequest}') `;
@@ -797,7 +877,7 @@ router.post("/submitform", async (req, res) => {
 
 //Login Route
 
-router.post("/login", async (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     let companyname = req.body.companyname;
     let username = req.body.username;
@@ -830,10 +910,10 @@ router.post("/login", async (req, res) => {
             const policy = JSON.stringify({
               Statement: [
                 {
-                  Resource: CC.cfurl + companyId + "/*",
+                  Resource: CC.cfurl + companyId + '/*',
                   Condition: {
                     DateLessThan: {
-                      "AWS:EpochTime":
+                      'AWS:EpochTime':
                         Math.floor(new Date().getTime() / 1000) +
                         60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
                     },
@@ -844,31 +924,31 @@ router.post("/login", async (req, res) => {
             const cookie = cloudFront.getSignedCookie({
               policy,
             });
-            const token = await create_token(id, "3h");
+            const token = await create_token(id, '3h');
             let dp = await generate_dropdown(id, isManager);
             if (dp) {
               res.cookie(
-                "CloudFront-Key-Pair-Id",
-                cookie["CloudFront-Key-Pair-Id"],
+                'CloudFront-Key-Pair-Id',
+                cookie['CloudFront-Key-Pair-Id'],
                 {
                   domain,
-                  path: "/",
+                  path: '/',
                   httpOnly: true,
                 }
               );
 
-              res.cookie("CloudFront-Policy", cookie["CloudFront-Policy"], {
+              res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
                 domain,
-                path: "/",
+                path: '/',
                 httpOnly: true,
               });
 
               res.cookie(
-                "CloudFront-Signature",
-                cookie["CloudFront-Signature"],
+                'CloudFront-Signature',
+                cookie['CloudFront-Signature'],
                 {
                   domain,
-                  path: "/",
+                  path: '/',
                   httpOnly: true,
                 }
               );
@@ -899,7 +979,7 @@ router.post("/login", async (req, res) => {
 
 //Validate User Token
 
-router.post("/validate", async (req, res) => {
+router.post('/validate', async (req, res) => {
   try {
     let r = await validate_token(req.body.token);
 
@@ -913,16 +993,16 @@ router.post("/validate", async (req, res) => {
 
 //Refresh token route
 
-router.post("/refresh", auth, async (req, res) => {
+router.post('/refresh', auth, async (req, res) => {
   let userInfo = await getUserInfo(req.userId);
   let compnayId = userInfo.companyId;
   const policy = JSON.stringify({
     Statement: [
       {
-        Resource: CC.cfurl + compnayId + "/*",
+        Resource: CC.cfurl + compnayId + '/*',
         Condition: {
           DateLessThan: {
-            "AWS:EpochTime":
+            'AWS:EpochTime':
               Math.floor(new Date().getTime() / 1000) + 60 * CC.cookieexpiry, // Current Time in UTC + time in seconds, (60 * 60 * 1 = 1 hour)
           },
         },
@@ -932,22 +1012,22 @@ router.post("/refresh", auth, async (req, res) => {
   const cookie = cloudFront.getSignedCookie({
     policy,
   });
-  const token = await create_token(req.userId, "3h");
-  res.cookie("CloudFront-Key-Pair-Id", cookie["CloudFront-Key-Pair-Id"], {
+  const token = await create_token(req.userId, '3h');
+  res.cookie('CloudFront-Key-Pair-Id', cookie['CloudFront-Key-Pair-Id'], {
     domain,
-    path: "/",
+    path: '/',
     httpOnly: true,
   });
 
-  res.cookie("CloudFront-Policy", cookie["CloudFront-Policy"], {
+  res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
     domain,
-    path: "/",
+    path: '/',
     httpOnly: true,
   });
 
-  res.cookie("CloudFront-Signature", cookie["CloudFront-Signature"], {
+  res.cookie('CloudFront-Signature', cookie['CloudFront-Signature'], {
     domain,
-    path: "/",
+    path: '/',
     httpOnly: true,
   });
   res.send({
@@ -956,21 +1036,21 @@ router.post("/refresh", auth, async (req, res) => {
 });
 //Logout Route to clear Cookies
 
-router.post("/logout", async (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
-    res.clearCookie("CloudFront-Key-Pair-Id", {
+    res.clearCookie('CloudFront-Key-Pair-Id', {
       domain,
-      path: "/",
+      path: '/',
       httpOnly: true,
     });
-    res.clearCookie("CloudFront-Policy", {
+    res.clearCookie('CloudFront-Policy', {
       domain,
-      path: "/",
+      path: '/',
       httpOnly: true,
     });
-    res.clearCookie("CloudFront-Signature", {
+    res.clearCookie('CloudFront-Signature', {
       domain,
-      path: "/",
+      path: '/',
       httpOnly: true,
     });
     responseSender(res, `Cookie Cleared`);
@@ -981,7 +1061,7 @@ router.post("/logout", async (req, res) => {
 
 //Forgot Password Route
 
-router.post("/forgotpass", async (req, res) => {
+router.post('/forgotpass', async (req, res) => {
   try {
     let username = req.body.username;
     if (!username) {
@@ -994,18 +1074,18 @@ router.post("/forgotpass", async (req, res) => {
         let id = userQuery.results[0].userId;
         let emailId = userQuery.results[0].emailId;
         if (id) {
-          const token = await create_token(id, "3h");
+          const token = await create_token(id, '3h');
           let transporter = nodemailer.createTransport({
-            service: "gmail",
+            service: 'gmail',
             auth: {
-              user: "jayanth.m1995@gmail.com",
-              pass: "i@143magge",
+              user: 'jayanth.m1995@gmail.com',
+              pass: 'i@143magge',
             },
           });
           let info = await transporter.sendMail({
-            from: "jayanth.m1995@gmail.com",
+            from: 'jayanth.m1995@gmail.com',
             to: emailId,
-            subject: "Password Reset",
+            subject: 'Password Reset',
             html: `<div>
                                 <h1> Update Password</h1>
                                 <span> To Update click the below link and follow the steps
@@ -1016,7 +1096,7 @@ router.post("/forgotpass", async (req, res) => {
                                 <a href='${CC.RESETPASSLINK}/${token}'>Click here to Reset</a>
                                 </div>`, // html body
           });
-          if (info["accepted"].length > 0) {
+          if (info['accepted'].length > 0) {
             responseSender(res, `Email Sent to registered Address`);
           } else {
             responseSender(res, `Error Sending Email`);
@@ -1031,7 +1111,7 @@ router.post("/forgotpass", async (req, res) => {
 
 //Update Pass route
 
-router.post("/updatepass", auth, async (req, res) => {
+router.post('/updatepass', auth, async (req, res) => {
   try {
     let userId = req.userId;
     let password = req.body.password;
@@ -1072,7 +1152,7 @@ router.post("/updatepass", auth, async (req, res) => {
 
 //Get all Users Based on ManagerId
 
-router.get("/manager/:userid", auth, async (req, res) => {
+router.get('/manager/:userid', auth, async (req, res) => {
   try {
     let userId = req.params.userid;
     let results = [];
@@ -1129,7 +1209,7 @@ router.get("/manager/:userid", auth, async (req, res) => {
 
 //Get all Users Based on TeamId
 
-router.get("/teams/:teamid", auth, async (req, res) => {
+router.get('/teams/:teamid', auth, async (req, res) => {
   try {
     let results = [];
     let teamId = req.params.teamid;
@@ -1160,7 +1240,7 @@ router.get("/teams/:teamid", auth, async (req, res) => {
 
 //Deepdive DropDown
 
-router.post("/deepdivedropdown", auth, async (req, res) => {
+router.post('/deepdivedropdown', auth, async (req, res) => {
   try {
     let results;
     let managerId = req.body.managerId;
@@ -1207,7 +1287,7 @@ router.post("/deepdivedropdown", auth, async (req, res) => {
 
 //Deepdive Route
 
-router.post("/deepdive/", auth, async (req, res) => {
+router.post('/deepdive/', auth, async (req, res) => {
   try {
     let userId = req.body.userId;
     let userInfo = await getUserInfo(req.userId);
@@ -1305,7 +1385,7 @@ router.post("/deepdive/", auth, async (req, res) => {
                 r1.push(r);
               }
             }
-            let a = groupBy(r1, "hour");
+            let a = groupBy(r1, 'hour');
             rr.push(a);
           }
         }
@@ -1336,7 +1416,7 @@ router.post("/deepdive/", auth, async (req, res) => {
 
 //Details Route
 
-router.post("/details", auth, async (req, res) => {
+router.post('/details', auth, async (req, res) => {
   try {
     let userId = req.body.userId;
     let userInfo = await getUserInfo(req.userId);
@@ -1426,7 +1506,7 @@ router.post("/details", auth, async (req, res) => {
                   r1.push(r);
                 }
               }
-              let a = groupBy(r1, "hour");
+              let a = groupBy(r1, 'hour');
               rr.push(a);
             }
           }
@@ -1453,7 +1533,7 @@ router.post("/details", auth, async (req, res) => {
 
 //Timecard Breakup data from timecardId
 
-router.post("/zoom", auth, async (req, res) => {
+router.post('/zoom', auth, async (req, res) => {
   try {
     let timecardId = req.body.timecardId;
     let timecardBreakupId = req.body.timecardBreakupId;
@@ -1545,7 +1625,7 @@ router.post("/zoom", auth, async (req, res) => {
 
 //Flagging Timecard
 
-router.post("/flag/:timecard", auth, async (req, res) => {
+router.post('/flag/:timecard', auth, async (req, res) => {
   try {
     let userInfo = await getUserInfo(req.userId);
     let timecardId = req.params.timecard;
@@ -1556,13 +1636,13 @@ router.post("/flag/:timecard", auth, async (req, res) => {
         responseSender(res, `You don't have access to flag timecard`);
       } else {
         let status = await checkTimecardStatus(timecardId);
-        if (status === "flagged") {
-          let unflag = await updateTImecardStatus(timecardId, "approved");
+        if (status === 'flagged') {
+          let unflag = await updateTImecardStatus(timecardId, 'approved');
           unflag === true
             ? responseSender(res, `Successfully Unflagged`)
             : responseSender(res, `Timecard with the specified ID Not Found`);
         } else {
-          let flag = await updateTImecardStatus(timecardId, "flagged");
+          let flag = await updateTImecardStatus(timecardId, 'flagged');
           flag === true
             ? responseSender(res, `Successfully Flagged`)
             : responseSender(res, `Timecard with the specified ID Not Found`);
@@ -1574,20 +1654,20 @@ router.post("/flag/:timecard", auth, async (req, res) => {
   }
 });
 
-router.post("/comment/:id", auth, async (req, res) => {
+router.post('/comment/:id', auth, async (req, res) => {
   try {
     let timecardBreakupId = req.params.id;
     let userInfo = await getUserInfo(req.userId);
     var today = new Date();
     var date =
       today.getFullYear() +
-      "-" +
+      '-' +
       (today.getMonth() + 1) +
-      "-" +
+      '-' +
       today.getDate();
     var time =
-      today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
-    var dateTime = date + " " + time;
+      today.getHours() + ':' + today.getMinutes() + ':' + today.getSeconds();
+    var dateTime = date + ' ' + time;
     if (!timecardBreakupId) {
       responseSender(res, `No timecardBreakupId Specified`);
     } else {
@@ -1624,7 +1704,7 @@ router.post("/comment/:id", auth, async (req, res) => {
   }
 });
 
-router.get("/comment/:id", auth, async (req, res) => {
+router.get('/comment/:id', auth, async (req, res) => {
   try {
     let timecardBreakupId = req.params.id;
     if (!timecardBreakupId) {
@@ -1644,20 +1724,20 @@ router.get("/comment/:id", auth, async (req, res) => {
   }
 });
 
-router.post("/timecard", auth, async (req, res) => {
+router.post('/timecard', auth, async (req, res) => {
   try {
     let userId = req.userId;
-    let method = req.body.method || "list"; // list,request,approval
-    let hierarchy = req.body.hierarchy || "Direct"; //Direct,Full
+    let method = req.body.method || 'list'; // list,request,approval
+    let hierarchy = req.body.hierarchy || 'Direct'; //Direct,Full
     let timecardIds = req.body.timecardIds;
     let comments = req.body.comments;
     let status = req.body.status; // approved,rejected
     let userInfo = await getUserInfo(userId);
-    if (method === "list") {
-      if (!accessChecker(userInfo.roleId, "TimeCard")) {
+    if (method === 'list') {
+      if (!accessChecker(userInfo.roleId, 'TimeCard')) {
         responseSender(res, `You Don't have access`);
       } else {
-        if (hierarchy === "Direct" || hierarchy === "Full") {
+        if (hierarchy === 'Direct' || hierarchy === 'Full') {
           let memberIds = await getMemberIds(userId, hierarchy);
           //Get list of timecardDisputes
           let tDQ = `SELECT user.name,user.empId,timecard.timecardId,timecardDisputes.disputeReason,DATE_FORMAT(timecard.timecard,'%Y-%m-%d %H:%i') as timecard,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,CONCAT(user.userId, "/",DATE(timecard.timecard)) as timecardLink
@@ -1665,54 +1745,54 @@ router.post("/timecard", auth, async (req, res) => {
                         WHERE timecard.timecardId =timecardDisputes.timecardId AND timecardDisputes.userID IN(${memberIds.toString()})AND timecardDisputes.status = 'open' AND user.userId = timecard.userId`;
           let tDQR = await db.query(tDQ);
           tDQR.results.length < 1
-            ? responseSender(res, "No Open Disputes")
+            ? responseSender(res, 'No Open Disputes')
             : res.send(tDQR.results);
         } else {
-          responseSender(res, "hierarchy either Direct or Full");
+          responseSender(res, 'hierarchy either Direct or Full');
         }
       }
     }
-    if (method === "delete") {
+    if (method === 'delete') {
       if (!timecardIds) {
-        responseSender(res, "No timecard Specified");
+        responseSender(res, 'No timecard Specified');
       } else {
         //TODO delete timecard
       }
     }
-    if (method === "request") {
+    if (method === 'request') {
       if (userInfo.userId === userId) {
         if (!timecardIds) {
-          responseSender(res, "No timecard Specified");
+          responseSender(res, 'No timecard Specified');
         } else {
           let st = true;
           for (let t = 0; t < timecardIds.length; t++) {
-            let id = await timecardDisputesHandler("add", timecardIds[t], {
+            let id = await timecardDisputesHandler('add', timecardIds[t], {
               userId,
               disputeReason: comments,
-              status: "open",
+              status: 'open',
             });
             if (id === false || id === null) {
               st = false;
             }
           }
           st
-            ? responseSender(res, "Dispute Raised Successfully")
-            : responseSender(res, "Error During Raising Dispute");
+            ? responseSender(res, 'Dispute Raised Successfully')
+            : responseSender(res, 'Error During Raising Dispute');
         }
       } else {
         responseSender(res, `You Don't have access`);
       }
     }
-    if (method === "approval") {
-      if (!accessChecker(userInfo.roleId, "TimeCard")) {
+    if (method === 'approval') {
+      if (!accessChecker(userInfo.roleId, 'TimeCard')) {
         responseSender(res, `You Don't have access`);
       } else {
         if (!timecardIds) {
-          responseSender(res, "No timecard Specified");
+          responseSender(res, 'No timecard Specified');
         } else {
           let st = true;
           for (let t = 0; t < timecardIds.length; t++) {
-            let ud = await timecardDisputesHandler("update", timecardIds[t], {
+            let ud = await timecardDisputesHandler('update', timecardIds[t], {
               approverComments: comments,
               status: status,
             });
@@ -1721,9 +1801,9 @@ router.post("/timecard", auth, async (req, res) => {
             }
           }
           if (st == true) {
-            responseSender(res, "Dispute Updated Successfully");
+            responseSender(res, 'Dispute Updated Successfully');
           } else {
-            responseSender(res, "Error During Updating Dispute");
+            responseSender(res, 'Error During Updating Dispute');
           }
         }
       }
@@ -1733,11 +1813,11 @@ router.post("/timecard", auth, async (req, res) => {
   }
 });
 
-router.post("/manualtimecard", auth, async (req, res) => {
+router.post('/manualtimecard', auth, async (req, res) => {
   try {
     let userId = req.userId;
-    let method = req.body.method || "list"; //list,request,approval
-    let hierarchy = req.body.hierarchy || "Direct"; //Direct,Full
+    let method = req.body.method || 'list'; //list,request,approval
+    let hierarchy = req.body.hierarchy || 'Direct'; //Direct,Full
     let date = req.body.date;
     let startTime = req.body.startTime;
     let EndTime = req.body.EndTime;
@@ -1746,47 +1826,52 @@ router.post("/manualtimecard", auth, async (req, res) => {
     let comments = req.body.comments;
     let status = req.body.status;
     let userInfo = await getUserInfo(userId);
-    if (method === "list") {
-      if (!accessChecker(userInfo.roleId, "Manual TimeCard")) {
+    if (method === 'list') {
+      if (!accessChecker(userInfo.roleId, 'Manual TimeCard')) {
         responseSender(res, `You Don't have access`);
       } else {
         let memberIds = await getMemberIds(userId, hierarchy);
         //Get list of ManualTimecards
-        let mtQ = `SELECT manualTimeId,startTime,endTime,manualTimeReason
+        let mtQ = `SELECT manualTimeId,CONCAT(DATE(startTime),' ',TIME(startTime)) as startTime,CONCAT(DATE(endTime),' ',TIME(endTime)) as endTime,manualTimeReason
                         FROM manualTime
                         WHERE manualTime.userID IN(${memberIds.toString()})AND manualTime.status = 'open'`;
-
         let mtQR = await db.query(mtQ);
         mtQR.results.length < 1
-          ? responseSender(res, "No Manual Timecards requested")
+          ? responseSender(res, 'No Manual Timecards requested')
           : res.send(mtQR.results);
       }
     }
-    if (method === "request") {
+    if (method === 'request') {
       if (userInfo.userId === userId) {
         if (!(date && startTime && EndTime && reason)) {
           responseSender(res, `Missing Fields`);
         } else {
-          let check = await checkTimecardExits(
+          //Check timecard Exists or Not
+          let check = await checkTimecardExists(
             date,
             startTime,
             EndTime,
             userId
           );
           if (check === true) {
-            responseSender(res, "Timecard Already Exits")
+            responseSender(res, 'Timecard Already Exits');
           } else {
-              let r = await manualTimecardHandler("add", userId, {
+            let r = await manualTimecardHandler(
+              'add',
+              userId,
+              {
                 date: date,
                 startTime: startTime,
                 endTime: EndTime,
                 reason: reason,
-                status: "open",
-            });
-            if(r){
-              responseSender(res, "Manual Timecard Requested Successfully");
-            }else{
-              responseSender(res, "Error During requesting Manula Timecard");
+                status: 'open',
+              },
+              req.userId
+            );
+            if (r) {
+              responseSender(res, 'Manual Timecard Requested Successfully');
+            } else {
+              responseSender(res, 'Error During requesting Manual Timecard');
             }
           }
         }
@@ -1794,31 +1879,33 @@ router.post("/manualtimecard", auth, async (req, res) => {
         responseSender(res, `You Don't have access`);
       }
     }
-    if (method === "approval") {
-      if (!accessChecker(userInfo.roleId, "Manual TimeCard")) {
+    if (method === 'approval') {
+      if (!accessChecker(userInfo.roleId, 'Manual TimeCard')) {
         responseSender(res, `You Don't have access`);
       } else {
         if (!manualtimecardIds) {
-          responseSender(res, "No Id Specified");
+          responseSender(res, 'No Id Specified');
         } else {
-          let st = true;
+          let results = [];
           for (let t = 0; t < manualtimecardIds.length; t++) {
             let ud = await manualTimecardHandler(
-              "update",
+              'update',
               manualtimecardIds[t],
               {
                 approverComments: comments,
                 status: status,
-              }
+              },
+              userInfo.name
             );
-            //TODO Checks before Approving Manual Timecards
-            if (ud === false || ud === null) {
-              st = false;
-            }
+            let rJson = [
+              {
+                id: manualtimecardIds[t],
+                status: ud,
+              },
+            ];
+            results.push(rJson);
           }
-          st
-            ? responseSender(res, "Manual Timecard Updated Successfully")
-            : responseSender(res, "Error During Updating Manual Timecard");
+          responseSender(res, results);
         }
       }
     }
@@ -1827,10 +1914,10 @@ router.post("/manualtimecard", auth, async (req, res) => {
   }
 });
 
-router.post("/mytasks", auth, async (req, res) => {
+router.post('/mytasks', auth, async (req, res) => {
   try {
     let userId = req.userId;
-    let hierarchy = req.body.hierarchy || "Direct"; //Direct,Full
+    let hierarchy = req.body.hierarchy || 'Direct'; //Direct,Full
     let userInfo = await getUserInfo(userId);
     if (userInfo.isManager !== 1) {
       responseSender(res, `You don't have access`);
@@ -1854,10 +1941,10 @@ router.post("/mytasks", auth, async (req, res) => {
   }
 });
 
-router.post("/newcompany", auth, async (req, res) => {
+router.post('/newcompany', auth, async (req, res) => {
   try {
     let userId = req.userId;
-    let method = req.body.method || "list"; // list,add,delete
+    let method = req.body.method || 'list'; // list,add,delete
     let compnayId = req.body.compnayId;
     //Data for Adding New Compnay
     let name = req.body.name; //string
@@ -1870,7 +1957,7 @@ router.post("/newcompany", auth, async (req, res) => {
     let billingPlan = req.body.billingPlan;
     let billingRate = req.body.billingRate;
     let billingCurrency = req.body.billingCurrency; //Currnecy lik e INR
-    let status = req.body.status || "active"; //don't send
+    let status = req.body.status || 'active'; //don't send
     let timecardsize = req.body.timecardsize; //integer
     let timecardbreakupsize = req.body.timecardbreakupsize; //integer
     let enablewebcam = req.body.enablewebcam; // yes or no if yes 1 or 0
@@ -1884,10 +1971,10 @@ router.post("/newcompany", auth, async (req, res) => {
     let updated = req.body.updated; //date time
     let updatedBy = req.body.updatedBy;
     let userInfo = await getUserInfo(userId);
-    if (!accessChecker(userInfo.roleId, "Company")) {
+    if (!accessChecker(userInfo.roleId, 'Company')) {
       responseSender(res, `You Don't have access`);
     } else {
-      if (method === "list") {
+      if (method === 'list') {
         let cQ = `SELECT name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy
             FROM company
             WHERE status ='active'`;
@@ -1896,7 +1983,7 @@ router.post("/newcompany", auth, async (req, res) => {
           ? responseSender(res, `No Company to List`)
           : res.send(cQR.results);
       }
-      if (method === "add") {
+      if (method === 'add') {
         let nQ = `INSERT INTO company(name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy)VALUES('${name}','${fullName}','${address}','${city}','${state}','${pincode}','${country}','${billingPlan}','${billingRate}','${billingCurrency}','${status}',${timecardsize},${timecardbreakupsize},${enablewebcam},${enablescreenshot},${mousePerTC},${keysPerTC},'${IntDiscard}','${intRed}','${intYellow}','${termsConditions}','${updated}','${updatedBy}')`;
 
         let nQR = await db.query(nQ);
@@ -1904,7 +1991,7 @@ router.post("/newcompany", auth, async (req, res) => {
           ? responseSender(res, `Company Added`)
           : responseSender(res, `Error Try Agian`);
       }
-      if (method === "delete") {
+      if (method === 'delete') {
         if (!compnayId) {
           responseSender(res, `No CompanyId`);
         } else {
@@ -1921,14 +2008,14 @@ router.post("/newcompany", auth, async (req, res) => {
   }
 });
 
-router.post("/teamhandler", auth, async (req, res) => {
+router.post('/teamhandler', auth, async (req, res) => {
   try {
   } catch (error) {
     responseSender(res, error);
   }
 });
 
-router.post("/userhandler", auth, async (req, res) => {
+router.post('/userhandler', auth, async (req, res) => {
   try {
   } catch (error) {
     responseSender(res, error);
@@ -1936,7 +2023,7 @@ router.post("/userhandler", auth, async (req, res) => {
 });
 // Ram: This API is required outside of SaaS app.
 // Todo: this requires updation every time there is a change in /login authenticaiton logic
-router.post("/cServerAuth", async (req, res) => {
+router.post('/cServerAuth', async (req, res) => {
   let companyname = req.body.companyname;
   let username = req.body.username;
   let password = req.body.password;
@@ -1952,7 +2039,7 @@ router.post("/cServerAuth", async (req, res) => {
     if (Object.keys(results).length === 0) {
       res.send({
         auth: 0,
-        message: "No user.",
+        message: 'No user.',
       });
     } else {
       let haspass = results[0].password;
@@ -1971,7 +2058,7 @@ router.post("/cServerAuth", async (req, res) => {
         } else {
           res.send({
             auth: 0,
-            message: "Invalid credentials.",
+            message: 'Invalid credentials.',
           });
         }
       });
