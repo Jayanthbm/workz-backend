@@ -626,7 +626,7 @@ async function updateDailySummary(userId, summaryDate, status, amount = 10) {
     WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
   }
   let upadteDailySummaryQueryR = await db.query(upadteDailySummaryQuery);
-  return upadteDailySummaryQueryR.results.affectedRows === 1 ? true : false;
+  return true;
 }
 
 //Function to get Timecard Details
@@ -760,8 +760,10 @@ async function manualTimecardHandler(method, Id, data, approver) {
     }
     if (method === 'update') {
       if (data.status === 'approved') {
-        let diffInMins = Math.abs(new Date(eT) - new Date(sT)) / 60000;
         let manualTimecardDetails = await manualTimeCardDetails(Id);
+        sT = `${manualTimecardDetails.date} ${manualTimecardDetails.startTime}`;
+        eT = `${manualTimecardDetails.date} ${manualTimecardDetails.endTime}`;
+        let diffInMins = Math.abs(new Date(eT) - new Date(sT)) / 60000;
         let check = await checkTimecardExists(
           manualTimecardDetails.date,
           manualTimecardDetails.startTime,
@@ -771,28 +773,37 @@ async function manualTimecardHandler(method, Id, data, approver) {
         if (check === true) {
           return 'Timecard Exits';
         } else {
-          //TODO Update timecardtable
-          await newTimecard(
+          let a = await newTimecard(
             manualTimecardDetails.date,
             manualTimecardDetails.startTime,
             manualTimecardDetails.endTime,
             manualTimecardDetails.userId,
             approver
           );
-          return 'Addding Timecard Data';
-          // await updateDailySummary(Id, data.date, "approved", diffInMins);
+          if (a == true) {
+            let uD = await updateDailySummary(
+              Id,
+              manualTimecardDetails.date,
+              'approved',
+              diffInMins
+            );
+            let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
+            let umQR = await db.query(umQ);
+            return umQR.results.affectedRows === 1
+              ? 'Manual TimeCard Successfully Approved'
+              : 'Error';
+          } else {
+            return 'Error';
+          }
         }
       }
       if (data.status === 'rejected') {
         let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
         let umQR = await db.query(umQ);
         return umQR.results.affectedRows === 1
-          ? 'Manual TimeCard Successfully Rejected '
-          : 'Error During Rejection';
+          ? 'Manual TimeCard Successfully Rejected'
+          : 'Error';
       }
-      // let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
-      // let umQR = await db.query(umQ);
-      // return umQR.results.affectedRows === 1 ? true : false;
     }
   } else {
     return 'Error';
@@ -1886,7 +1897,8 @@ router.post('/manualtimecard', auth, async (req, res) => {
         if (!manualtimecardIds) {
           responseSender(res, 'No Id Specified');
         } else {
-          let results = [];
+          let s = 0;
+          let f = 0;
           for (let t = 0; t < manualtimecardIds.length; t++) {
             let ud = await manualTimecardHandler(
               'update',
@@ -1897,15 +1909,17 @@ router.post('/manualtimecard', auth, async (req, res) => {
               },
               userInfo.name
             );
-            let rJson = [
-              {
-                id: manualtimecardIds[t],
-                status: ud,
-              },
-            ];
-            results.push(rJson);
+            console.log(ud);
+            if (ud === 'Timecard Exits' || ud === 'Error') {
+              f += 1;
+            } else {
+              s += 1;
+            }
           }
-          responseSender(res, results);
+          responseSender(res, {
+            success: s,
+            failed: f,
+          });
         }
       }
     }
