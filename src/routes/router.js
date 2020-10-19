@@ -740,8 +740,7 @@ async function newTimecard(date, startTime, endTime, userId, approver) {
       times.push(r);
       checker = checkTime(times[times.length - 1], endTime);
     }
-  } catch (error) {
-  }
+  } catch (error) {}
   times.shift();
   for (let i = 0; i < times.length; i++) {
     await addTimecard(userId, approver, `${date} ${times[i]}`);
@@ -1355,7 +1354,7 @@ router.post('/deepdive/', auth, async (req, res) => {
                   status: deepdive[i].status,
                   focus: deepdive[i].focus,
                   intensityScore: deepdive[i].intensityScore,
-                  manualTimecard:deepdive[i].screenshotUrl?false:true,
+                  manualTimecard: deepdive[i].screenshotUrl ? false : true,
                 };
                 r1.push(r);
               }
@@ -1393,7 +1392,7 @@ router.post('/deepdive/', auth, async (req, res) => {
                   status: deepdive[i].status,
                   focus: deepdive[i].focus,
                   intensityScore: deepdive[i].intensityScore,
-                  manualTimecard:deepdive[i].screenshotUrl?false:true,
+                  manualTimecard: deepdive[i].screenshotUrl ? false : true,
                 };
                 r1.push(r);
               }
