@@ -725,7 +725,7 @@ async function addTimecard(userId, approver, timecard) {
   let Itq = `INSERT INTO timecard(
     timecard,userId,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,approvedBy,focus,intensityScore,created
   )VALUES(
-    '${timecard}',${userId},0,0,0,'Manual Timecard','Manual Timecard',NULL,NULL,NULL,'approved','${approver}',0,0,current_timestamp()
+    '${timecard}',${userId},0,0,0,'','',NULL,NULL,NULL,'approved','${approver}',0,0,current_timestamp()
   )`;
   let ItqR = await db.query(Itq);
   return ItqR.results.affectedRows === 1 ? true : false;
@@ -741,7 +741,6 @@ async function newTimecard(date, startTime, endTime, userId, approver) {
       checker = checkTime(times[times.length - 1], endTime);
     }
   } catch (error) {
-    console.log(error);
   }
   times.shift();
   for (let i = 0; i < times.length; i++) {
@@ -1356,6 +1355,7 @@ router.post('/deepdive/', auth, async (req, res) => {
                   status: deepdive[i].status,
                   focus: deepdive[i].focus,
                   intensityScore: deepdive[i].intensityScore,
+                  manualTimecard:deepdive[i].screenshotUrl?false:true,
                 };
                 r1.push(r);
               }
@@ -1374,6 +1374,7 @@ router.post('/deepdive/', auth, async (req, res) => {
                   status: deepdive[i].status,
                   focus: deepdive[i].focus,
                   intensityScore: deepdive[i].intensityScore,
+                  manualTimecard: deepdive[i].webcamUrl ? false : true,
                 };
                 r1.push(r);
               }
@@ -1392,6 +1393,7 @@ router.post('/deepdive/', auth, async (req, res) => {
                   status: deepdive[i].status,
                   focus: deepdive[i].focus,
                   intensityScore: deepdive[i].intensityScore,
+                  manualTimecard:deepdive[i].screenshotUrl?false:true,
                 };
                 r1.push(r);
               }
@@ -1909,7 +1911,6 @@ router.post('/manualtimecard', auth, async (req, res) => {
               },
               userInfo.name
             );
-            console.log(ud);
             if (ud === 'Timecard Exits' || ud === 'Error') {
               f += 1;
             } else {
@@ -1982,9 +1983,8 @@ router.post('/newcompany', auth, async (req, res) => {
     let intRed = req.body.intRed; //number allow decimal
     let intYellow = req.body.intYellow; //number allow decimal
     let termsConditions = req.body.termsConditions; //long text area
-    let updated = req.body.updated; //date time
-    let updatedBy = req.body.updatedBy;
     let userInfo = await getUserInfo(userId);
+    let updatedBy = userInfo.name;
     if (!accessChecker(userInfo.roleId, 'Company')) {
       responseSender(res, `You Don't have access`);
     } else {
@@ -1998,7 +1998,7 @@ router.post('/newcompany', auth, async (req, res) => {
           : res.send(cQR.results);
       }
       if (method === 'add') {
-        let nQ = `INSERT INTO company(name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy)VALUES('${name}','${fullName}','${address}','${city}','${state}','${pincode}','${country}','${billingPlan}','${billingRate}','${billingCurrency}','${status}',${timecardsize},${timecardbreakupsize},${enablewebcam},${enablescreenshot},${mousePerTC},${keysPerTC},'${IntDiscard}','${intRed}','${intYellow}','${termsConditions}','${updated}','${updatedBy}')`;
+        let nQ = `INSERT INTO company(name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy)VALUES('${name}','${fullName}','${address}','${city}','${state}','${pincode}','${country}','${billingPlan}','${billingRate}','${billingCurrency}','${status}',${timecardsize},${timecardbreakupsize},${enablewebcam},${enablescreenshot},${mousePerTC},${keysPerTC},'${IntDiscard}','${intRed}','${intYellow}','${termsConditions}',current_timestamp(),'${updatedBy}')`;
 
         let nQR = await db.query(nQ);
         nQR.results.affectedRows === 1
