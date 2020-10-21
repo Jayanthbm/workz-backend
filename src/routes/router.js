@@ -700,6 +700,9 @@ function addMinutes(time, minutes) {
   } else {
     min += 10;
   }
+  if(String(hour).length === 1){
+    hour = `0${String(hour)}`
+  }
   return `${hour}:${min}:00`;
 }
 function checkTime(stime, etime) {
@@ -722,88 +725,102 @@ function checkTime(stime, etime) {
   }
 }
 async function addTimecard(userId, approver, timecard) {
-  let Itq = `INSERT INTO timecard(
+  try {
+    let Itq = `INSERT INTO timecard(
     timecard,userId,clientId,keyCounter,mouseCounter,appName,windowName,windowUrl,screenshotUrl,webcamUrl,status,approvedBy,focus,intensityScore,created
   )VALUES(
     '${timecard}',${userId},0,0,0,'','',NULL,NULL,NULL,'approved','${approver}',0,0,current_timestamp()
   )`;
-  let ItqR = await db.query(Itq);
-  return ItqR.results.affectedRows === 1 ? true : false;
-}
-async function newTimecard(date, startTime, endTime, userId, approver) {
-  let times = [];
-  times.push(startTime);
-  try {
-    let checker = true;
-    while (checker) {
-      let r = addMinutes(times[times.length - 1], 10);
-      times.push(r);
-      checker = checkTime(times[times.length - 1], endTime);
-    }
-  } catch (error) {}
-  times.shift();
-  for (let i = 0; i < times.length; i++) {
-    await addTimecard(userId, approver, `${date} ${times[i]}`);
+    let ItqR = await db.query(Itq);
+    return ItqR.results.affectedRows === 1 ? true : false;
+  } catch (error) {
+    console.log(error);
+    return false;
   }
-  return true;
+}
+async function newTimecard(date, startTime, endTime, userId, approver,diffInMins) {
+  try {
+    let looper = parseInt(diffInMins/10);
+    let times = [];
+    times.push(startTime);
+    for(let t = 0;t<looper;t++){
+      let r = addMinutes(times[t], 10);
+      times.push(r);
+    }
+    times.shift();
+    let check = false;
+    for (let i = 0; i < times.length; i++) {
+      check = await addTimecard(userId, approver, `${date} ${times[i]}`);
+    }
+    return check;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
 }
 async function manualTimecardHandler(method, Id, data, approver) {
-  let sT = `${data.date} ${data.startTime}`;
-  let eT = `${data.date} ${data.endTime}`;
-  if (Id) {
-    if (method === 'add') {
-      let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${Id},'${sT}','${eT}','${data.reason}','${data.status}')`;
-      let imQR = await db.query(imQ);
-      return imQR.results.affectedRows === 1 ? true : false;
-    }
-    if (method === 'update') {
-      if (data.status === 'approved') {
-        let manualTimecardDetails = await manualTimeCardDetails(Id);
-        sT = `${manualTimecardDetails.date} ${manualTimecardDetails.startTime}`;
-        eT = `${manualTimecardDetails.date} ${manualTimecardDetails.endTime}`;
-        let diffInMins = Math.abs(new Date(eT) - new Date(sT)) / 60000;
-        let check = await checkTimecardExists(
-          manualTimecardDetails.date,
-          manualTimecardDetails.startTime,
-          manualTimecardDetails.endTime,
-          manualTimecardDetails.userId
-        );
-        if (check === true) {
-          return 'Timecard Exits';
-        } else {
-          let a = await newTimecard(
+  try {
+    let sT = `${data.date} ${data.startTime}`;
+    let eT = `${data.date} ${data.endTime}`;
+    if (Id) {
+      if (method === 'add') {
+        let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${Id},'${sT}','${eT}','${data.reason}','${data.status}')`;
+        let imQR = await db.query(imQ);
+        return imQR.results.affectedRows === 1 ? true : false;
+      }
+      if (method === 'update') {
+        if (data.status === 'approved') {
+          let manualTimecardDetails = await manualTimeCardDetails(Id);
+          sT = `${manualTimecardDetails.date} ${manualTimecardDetails.startTime}`;
+          eT = `${manualTimecardDetails.date} ${manualTimecardDetails.endTime}`;
+          let diffInMins = Math.abs(new Date(eT) - new Date(sT)) / 60000;
+          let check = await checkTimecardExists(
             manualTimecardDetails.date,
             manualTimecardDetails.startTime,
             manualTimecardDetails.endTime,
-            manualTimecardDetails.userId,
-            approver
+            manualTimecardDetails.userId
           );
-          if (a == true) {
-            let uD = await updateDailySummary(
-              Id,
-              manualTimecardDetails.date,
-              'approved',
-              diffInMins
-            );
-            let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
-            let umQR = await db.query(umQ);
-            return umQR.results.affectedRows === 1
-              ? 'Manual TimeCard Successfully Approved'
-              : 'Error';
+          if (check === true) {
+            return 'Timecard Exits';
           } else {
-            return 'Error';
+            let a = await newTimecard(
+              manualTimecardDetails.date,
+              manualTimecardDetails.startTime,
+              manualTimecardDetails.endTime,
+              manualTimecardDetails.userId,
+              approver,
+              diffInMins,
+            );
+            if (a == true) {
+              let uD = await updateDailySummary(
+                Id,
+                manualTimecardDetails.date,
+                'approved',
+                diffInMins
+              );
+              let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
+              let umQR = await db.query(umQ);
+              return umQR.results.affectedRows === 1
+                ? 'Manual TimeCard Successfully Approved'
+                : 'Error';
+            } else {
+              return 'Error';
+            }
           }
         }
+        if (data.status === 'rejected') {
+          let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
+          let umQR = await db.query(umQ);
+          return umQR.results.affectedRows === 1
+            ? 'Manual TimeCard Successfully Rejected'
+            : 'Error';
+        }
       }
-      if (data.status === 'rejected') {
-        let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
-        let umQR = await db.query(umQ);
-        return umQR.results.affectedRows === 1
-          ? 'Manual TimeCard Successfully Rejected'
-          : 'Error';
-      }
+    } else {
+      return 'Error';
     }
-  } else {
+  } catch (error) {
+    console.log(error);
     return 'Error';
   }
 }
@@ -1894,7 +1911,7 @@ router.post('/manualtimecard', auth, async (req, res) => {
     if (method === 'approval') {
       if (!accessChecker(userInfo.roleId, 'Manual TimeCard')) {
         responseSender(res, `You Don't have access`);
-      } else {
+      }else {
         if (!manualtimecardIds) {
           responseSender(res, 'No Id Specified');
         } else {
