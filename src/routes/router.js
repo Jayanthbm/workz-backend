@@ -1972,7 +1972,7 @@ router.post('/mytasks', auth, async (req, res) => {
   }
 });
 
-router.post('/newcompany', auth, async (req, res) => {
+router.post('/company', auth, async (req, res) => {
   try {
     let userId = req.userId;
     let method = req.body.method || 'list'; // list,add,delete
@@ -2005,7 +2005,7 @@ router.post('/newcompany', auth, async (req, res) => {
       responseSender(res, `You Don't have access`);
     } else {
       if (method === 'list') {
-        let cQ = `SELECT name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy
+        let cQ = `SELECT companyId,name,fullName,address,city,state,pincode,country,billingPlan,billingRate,billingCurrency,status,timecardsize,timecardbreakupsize,enablewebcam,enablescreenshot,mousePerTC,keysPerTC,IntDiscard,intRed,intYellow,termsConditions,updated,updatedBy
             FROM company
             WHERE status ='active'`;
         let cQR = await db.query(cQ);
