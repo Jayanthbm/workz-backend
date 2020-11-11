@@ -870,6 +870,15 @@ async function checkTimecardExists(date, startTime, EndTime, userId) {
   }
 }
 
+async function updateCompnayStaus(companyId,status){
+  let uQ = `UPDATE company SET status ='${status}' WHERE companyId=${companyId}`;
+  let uQR = await db.query(uQ);
+  if(uQR.results.affectedRows === 1){
+    return 'Success';
+  }else{
+    return 'Error';
+  }
+}
 //Routes
 //TODO remove route during production
 
@@ -1976,7 +1985,7 @@ router.post('/company', auth, async (req, res) => {
   try {
     let userId = req.userId;
     let method = req.body.method || 'list'; // list,add,delete
-    let compnayId = req.body.compnayId;
+    let compnayIds = req.body.compnayId;
     //Data for Adding New Compnay
     let name = req.body.name; //string
     let fullName = req.body.fullName; //string
@@ -2022,14 +2031,23 @@ router.post('/company', auth, async (req, res) => {
           : responseSender(res, `Error Try Agian`);
       }
       if (method === 'delete') {
-        if (!compnayId) {
+        if (!compnayIds) {
           responseSender(res, `No CompanyId`);
         } else {
-          let uQ = `UPDATE company SET status ='Inactive' WHERE companyId=${compnayId}`;
-          let uQR = await db.query(uQ);
-          uQR.results.affectedRows === 1
-            ? responseSender(res, `Company Deleted`)
-            : responseSender(res, `Error During Update`);
+          let s = 0;
+          let f = 0;
+          for(c =0;c<compnayIds.length;c++){
+            let uc =updateCompnayStaus(compnayIds[c],'Inactive');
+            if (uc === 'Error') {
+              f += 1;
+            } else {
+              s += 1;
+            }
+          }
+          responseSender(res, {
+            success: s,
+            failed: f,
+          });
         }
       }
     }
