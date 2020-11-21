@@ -700,8 +700,8 @@ function addMinutes(time, minutes) {
   } else {
     min += 10;
   }
-  if(String(hour).length === 1){
-    hour = `0${String(hour)}`
+  if (String(hour).length === 1) {
+    hour = `0${String(hour)}`;
   }
   return `${hour}:${min}:00`;
 }
@@ -738,12 +738,19 @@ async function addTimecard(userId, approver, timecard) {
     return false;
   }
 }
-async function newTimecard(date, startTime, endTime, userId, approver,diffInMins) {
+async function newTimecard(
+  date,
+  startTime,
+  endTime,
+  userId,
+  approver,
+  diffInMins
+) {
   try {
-    let looper = parseInt(diffInMins/10);
+    let looper = parseInt(diffInMins / 10);
     let times = [];
     times.push(startTime);
-    for(let t = 0;t<looper;t++){
+    for (let t = 0; t < looper; t++) {
       let r = addMinutes(times[t], 10);
       times.push(r);
     }
@@ -789,7 +796,7 @@ async function manualTimecardHandler(method, Id, data, approver) {
               manualTimecardDetails.endTime,
               manualTimecardDetails.userId,
               approver,
-              diffInMins,
+              diffInMins
             );
             if (a == true) {
               let uD = await updateDailySummary(
@@ -870,12 +877,12 @@ async function checkTimecardExists(date, startTime, EndTime, userId) {
   }
 }
 
-async function updateCompnayStaus(companyId,status){
+async function updateCompnayStaus(companyId, status) {
   let uQ = `UPDATE company SET status ='${status}' WHERE companyId=${companyId}`;
   let uQR = await db.query(uQ);
-  if(uQR.results.affectedRows === 1){
+  if (uQR.results.affectedRows === 1) {
     return 'Success';
-  }else{
+  } else {
     return 'Error';
   }
 }
@@ -917,9 +924,7 @@ router.post('/login', async (req, res) => {
     let companyname = req.body.companyname;
     let username = req.body.username;
     let password = req.body.password;
-    if (!companyname && !username && !password) {
-      responseSender(res, `Invalid Credentials`);
-    } else {
+    if (companyname && username && password) {
       let loginQuery = `SELECT user.userId,user.companyId,user.empId,user.emailId,user.teamId,user.managerId,user.name as name,user.firstname,user.profilePic,user.profileThumbnailUrl,user.isManager,user.roleId,user.isActive,user.password,user.previousPassword FROM user,company WHERE user.companyId = company.companyId AND company.name='${companyname}' AND (user.empId ='${username}' or user.emailId ='${username}') AND  user.isActive =1 AND company.status='active'`;
       let loginResults = await db.query(loginQuery);
       let results = loginResults.results;
@@ -939,9 +944,7 @@ router.post('/login', async (req, res) => {
         let roleName = roles[roleId];
         let previousPassword = results[0].previousPassword;
         bcrypt.compare(password, haspass, async function (err, result) {
-          if (err) {
-            responseSender(res, `Error in Login`);
-          } else {
+          if (result) {
             const policy = JSON.stringify({
               Statement: [
                 {
@@ -971,13 +974,11 @@ router.post('/login', async (req, res) => {
                   httpOnly: true,
                 }
               );
-
               res.cookie('CloudFront-Policy', cookie['CloudFront-Policy'], {
                 domain,
                 path: '/',
                 httpOnly: true,
               });
-
               res.cookie(
                 'CloudFront-Signature',
                 cookie['CloudFront-Signature'],
@@ -1002,10 +1003,19 @@ router.post('/login', async (req, res) => {
                 profileThumbnailUrl,
                 previousPassword,
               });
-            }
+            }  else {
+              responseSender(res, `Invalid Credentials`);
+              }
+          } else {
+            responseSender(res, `Invalid Credentials`);
+          }
+          if(err){
+            responseSender(res, `Invalid Credentials`);
           }
         });
       }
+    } else {
+      responseSender(res, `Invalid Credentials`);
     }
   } catch (error) {
     responseSender(res, `Invalid Credentials`);
@@ -1920,7 +1930,7 @@ router.post('/manualtimecard', auth, async (req, res) => {
     if (method === 'approval') {
       if (!accessChecker(userInfo.roleId, 'Manual TimeCard')) {
         responseSender(res, `You Don't have access`);
-      }else {
+      } else {
         if (!manualtimecardIds) {
           responseSender(res, 'No Id Specified');
         } else {
@@ -2036,8 +2046,8 @@ router.post('/company', auth, async (req, res) => {
         } else {
           let s = 0;
           let f = 0;
-          for(c =0;c<compnayIds.length;c++){
-            let uc =updateCompnayStaus(compnayIds[c],'Inactive');
+          for (c = 0; c < compnayIds.length; c++) {
+            let uc = updateCompnayStaus(compnayIds[c], 'Inactive');
             if (uc === 'Error') {
               f += 1;
             } else {
