@@ -799,7 +799,7 @@ async function manualTimecardHandler(method, Id, data, approver) {
               diffInMins
             );
             if (a == true) {
-              let uD = await updateDailySummary(
+              await updateDailySummary(
                 Id,
                 manualTimecardDetails.date,
                 'approved',
@@ -823,11 +823,17 @@ async function manualTimecardHandler(method, Id, data, approver) {
             : 'Error';
         }
       }
+      if(method ==='delete'){
+        let dmQ = `DELETE FROM manualTime WHERE manualTimeId = ${Id} `;
+        let dmQR = await db.query(dmQ);
+              return dmQR.results.affectedRows === 1
+                ? 'Success'
+                : 'Error';
+      }
     } else {
       return 'Error';
     }
   } catch (error) {
-    console.log(error);
     return 'Error';
   }
 }
@@ -1824,8 +1830,8 @@ router.post('/timecard', auth, async (req, res) => {
             }
           }
           st
-            ? responseSender(res, 'Dispute Raised Successfully')
-            : responseSender(res, 'Error During Raising Dispute');
+            ? responseSender(res, 'Approval request Raised Successfully')
+            : responseSender(res, 'Error During Raising Approval Request');
         }
       } else {
         responseSender(res, `You Don't have access`);
@@ -1849,9 +1855,9 @@ router.post('/timecard', auth, async (req, res) => {
             }
           }
           if (st == true) {
-            responseSender(res, 'Dispute Updated Successfully');
+            responseSender(res, 'Approval Request Updated Successfully');
           } else {
-            responseSender(res, 'Error During Updating Dispute');
+            responseSender(res, 'Error During Updating Approval Request');
           }
         }
       }
@@ -1864,7 +1870,7 @@ router.post('/timecard', auth, async (req, res) => {
 router.post('/manualtimecard', auth, async (req, res) => {
   try {
     let userId = req.userId;
-    let method = req.body.method || 'list'; //list,request,approval
+    let method = req.body.method || 'list'; //list,request,approval,delete
     let hierarchy = req.body.hierarchy || 'Direct'; //Direct,Full
     let date = req.body.date;
     let startTime = req.body.startTime;
@@ -1873,20 +1879,31 @@ router.post('/manualtimecard', auth, async (req, res) => {
     let manualtimecardIds = req.body.manualtimecardIds;
     let comments = req.body.comments;
     let status = req.body.status;
+    let myManual = req.body.myManual;
     let userInfo = await getUserInfo(userId);
     if (method === 'list') {
-      if (!accessChecker(userInfo.roleId, 'Manual TimeCard')) {
-        responseSender(res, `You Don't have access`);
-      } else {
-        let memberIds = await getMemberIds(userId, hierarchy);
-        //Get list of ManualTimecards
+      if (myManual) {
         let mtQ = `SELECT manualTimeId,CONCAT(DATE(startTime),' ',TIME(startTime)) as startTime,CONCAT(DATE(endTime),' ',TIME(endTime)) as endTime,manualTimeReason
                         FROM manualTime
-                        WHERE manualTime.userID IN(${memberIds.toString()})AND manualTime.status = 'open'`;
+                        WHERE manualTime.userID IN(${userId})AND manualTime.status = 'open'`;
         let mtQR = await db.query(mtQ);
         mtQR.results.length < 1
-          ? responseSender(res, 'No Manual Timecards requested')
+          ? responseSender(res, 'No Manual Timecards')
           : res.send(mtQR.results);
+      } else {
+        if (!accessChecker(userInfo.roleId, 'Manual TimeCard')) {
+          responseSender(res, `You Don't have access`);
+        } else {
+          let memberIds = await getMemberIds(userId, hierarchy);
+          //Get list of ManualTimecards
+          let mtQ = `SELECT manualTimeId,CONCAT(DATE(startTime),' ',TIME(startTime)) as startTime,CONCAT(DATE(endTime),' ',TIME(endTime)) as endTime,manualTimeReason
+                        FROM manualTime
+                        WHERE manualTime.userID IN(${memberIds.toString()})AND manualTime.status = 'open'`;
+          let mtQR = await db.query(mtQ);
+          mtQR.results.length < 1
+            ? responseSender(res, 'No Manual Timecards')
+            : res.send(mtQR.results);
+        }
       }
     }
     if (method === 'request') {
@@ -1904,22 +1921,29 @@ router.post('/manualtimecard', auth, async (req, res) => {
           if (check === true) {
             responseSender(res, 'Timecard Already Exits');
           } else {
-            let r = await manualTimecardHandler(
-              'add',
-              userId,
-              {
-                date: date,
-                startTime: startTime,
-                endTime: EndTime,
-                reason: reason,
-                status: 'open',
-              },
-              req.userId
-            );
-            if (r) {
-              responseSender(res, 'Manual Timecard Requested Successfully');
+            if (reason) {
+              let r = await manualTimecardHandler(
+                'add',
+                userId,
+                {
+                  date: date,
+                  startTime: startTime,
+                  endTime: EndTime,
+                  reason: reason,
+                  status: 'open',
+                },
+                req.userId
+              );
+              if (r) {
+                responseSender(res, 'Manual Timecard Requested Successfully');
+              } else {
+                responseSender(
+                  res,
+                  'Duplicate Request: Request for this time period is already submitted.'
+                );
+              }
             } else {
-              responseSender(res, 'Error During requesting Manual Timecard');
+              responseSender(res, 'Justification is required.');
             }
           }
         }
@@ -1932,30 +1956,67 @@ router.post('/manualtimecard', auth, async (req, res) => {
         responseSender(res, `You Don't have access`);
       } else {
         if (!manualtimecardIds) {
-          responseSender(res, 'No Id Specified');
+          responseSender(res, 'No Ids Specified');
         } else {
-          let s = 0;
-          let f = 0;
-          for (let t = 0; t < manualtimecardIds.length; t++) {
-            let ud = await manualTimecardHandler(
-              'update',
-              manualtimecardIds[t],
-              {
-                approverComments: comments,
-                status: status,
-              },
-              userInfo.name
-            );
-            if (ud === 'Timecard Exits' || ud === 'Error') {
-              f += 1;
-            } else {
-              s += 1;
-            }
+          if  (comments)  {
+            let s = 0;
+              let f = 0;
+              for (let t = 0; t < manualtimecardIds.length; t++) {
+                let ud = await manualTimecardHandler(
+                  'update',
+                  manualtimecardIds[t],
+                  {
+                    approverComments: comments,
+                    status: status,
+                  },
+                  userInfo.name
+                );
+                let errorMessages = [];
+                if (ud === 'Timecard Exits' || ud === 'Error') {
+                  f += 1;
+                  if ('Timecard Exits') {
+                    errorMessages.push('Duplicate Request: Request for this time period is already submitted');
+                  } else {
+                    errorMessages.push('Error During Updation of Manual TimeCard');
+                  }
+                } else {
+                  s += 1;
+                }
+              }
+              responseSender(res, {
+                success: s,
+                failed: f,
+                errorMessage: errorMessages,
+                successMessage:'Manual TimeCard Updated Successfully',
+              });
+          }  else  {
+            responseSender(res, 'Justification is required.');
           }
+        }
+      }
+    }
+    if(method==='delete'){
+      if (!manualtimecardIds) {
+        responseSender(res, 'No Ids Specified');
+      }else{
+        for (let t = 0; t < manualtimecardIds.length; t++){
+          let de = await manualTimecardHandler(
+                  'delete',
+                  manualtimecardIds[t],
+                );
+          let errorMessages = [];
+          if (de === 'Error') {
+              f += 1;
+                errorMessages.push('Error During Deletion Of Manual Timecard');
+                } else {
+                  s += 1;
+              }
           responseSender(res, {
-            success: s,
-            failed: f,
-          });
+                success: s,
+                failed: f,
+                errorMessage: errorMessages,
+                successMessage:'Manual TimeCard Deleted Successfully',
+              });
         }
       }
     }
