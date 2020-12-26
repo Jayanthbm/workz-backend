@@ -618,8 +618,24 @@ async function updateDailySummary(userId, summaryDate, status, amount = 10) {
   let NsummaryDate = formatDate(summaryDate);
   let upadteDailySummaryQuery;
   if (status === 'approved') {
-    upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-${amount})/60),2)
-    WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
+    let checker = `SELECT userId,summaryDate FROM dailySummary WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}'`;
+    let r = await db.query(checker);
+    if(r.results.length  > 0){
+      upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-${amount})/60),2)
+      WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
+    }else{
+      let dayName ='';
+      let hoursLogged=0;
+      let hoursFlagged=0;
+      let hoursRejected=0;
+      let FTAR =0;
+      let metricsCount =0;
+      let focusScore =0;
+      let intensityScore = 0;
+      let alignmentScore =0;
+      // upadteDailySummaryQuery = `INSERT INTO dailySummary (userId,summaryDate,dayName,hoursLogged,hoursFlagged,hoursRejected,FTAR,metricsCount,focusScore,intensityScore,alignmentScore,updated)VALUES(${userId},'${NsummaryDate}','${dayName}',${hoursLogged},${hoursFlagged},${hoursRejected},${FTAR},${metricsCount},${focusScore},${intensityScore},,${alignmentScore},current_timestamp())`;
+      // console.log(upadteDailySummaryQuery);
+    }
   }
   if (status === 'rejected') {
     upadteDailySummaryQuery = `UPDATE dailySummary set hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2),hoursRejected=TRUNCATE((((hoursRejected*60)+${amount})/60),2)
@@ -804,7 +820,7 @@ async function manualTimecardHandler(method, Id, data, approver) {
             );
             if (a == true) {
               await updateDailySummary(
-                Id,
+                manualTimecardDetails.userId,
                 manualTimecardDetails.date,
                 "approved",
                 diffInMins
@@ -1115,7 +1131,8 @@ router.post('/forgotpass', async (req, res) => {
     if (!username) {
       responseSender(res, `No User Found`);
     } else {
-      let userQuery = `SELECT userId,empId,emailId FROM user WHERE empId = '${username}' or emailId= '${username}'`;
+      let userQ = `SELECT userId,empId,emailId FROM user WHERE empId = '${username}' or emailId= '${username}'`;
+      let userQuery = await db.query(userQ);
       if (userQuery.results.length < 1) {
         responseSender(res, `No User Found`);
       } else {
@@ -1153,7 +1170,7 @@ router.post('/forgotpass', async (req, res) => {
       }
     }
   } catch (error) {
-    responseSender(res, error);
+    responseSender(res, 'Error Try Again');
   }
 });
 
@@ -1958,35 +1975,35 @@ router.post('/manualtimecard', auth, async (req, res) => {
         } else {
           if  (comments)  {
             let s = 0;
-              let f = 0;
-              for (let t = 0; t < manualtimecardIds.length; t++) {
-                let ud = await manualTimecardHandler(
-                  'update',
+            let f = 0;
+            let messages = [];
+            for (let t = 0; t < manualtimecardIds.length; t++) {
+              let ud = await manualTimecardHandler(
+                  "update",
                   manualtimecardIds[t],
                   {
                     approverComments: comments,
                     status: status,
                   },
                   userInfo.name
-                );
-                let errorMessages = [];
-                if (ud === 'Timecard Exits' || ud === 'Error') {
-                  f += 1;
-                  if ('Timecard Exits') {
-                    errorMessages.push('Duplicate Request: Request for this time period is already submitted');
-                  } else {
-                    errorMessages.push('Error During Updation of Manual TimeCard');
-                  }
+              );
+              if (ud === "Timecard Exits" || ud === "Error") {
+                f += 1;
+                if ("Timecard Exits") {
+                  messages.push(`Timecard Id:${manualtimecardIds[t]}:Duplicate Request: Request for this time period is already submitted`);
                 } else {
-                  s += 1;
-                }
+                  messages.push(
+                    `Timecard Id: ${manualtimecardIds[t]}:Error During Updation of Manual TimeCard`
+                  );
               }
-              responseSender(res, {
-                success: s,
-                failed: f,
-                errorMessage: errorMessages,
-                successMessage:'Manual TimeCard Updated Successfully',
-              });
+              } else {
+                s += 1;
+                }
+          }
+            res.send({
+              message: `${s} ${status}, ${f} Failed`,
+              messages: messages,
+            });
           }  else  {
             responseSender(res, 'Justification is required.');
           }
@@ -2014,6 +2031,8 @@ router.post('/manualtimecard', auth, async (req, res) => {
       }
     }
   } catch (error) {
+    console.log("error");
+    console.log(error);
     responseSender(res, error);
   }
 });
