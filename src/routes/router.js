@@ -734,7 +734,6 @@ async function addTimecard(userId, approver, timecard) {
     let ItqR = await db.query(Itq);
     return ItqR.results.affectedRows === 1 ? true : false;
   } catch (error) {
-    console.log(error);
     return false;
   }
 }
@@ -761,22 +760,27 @@ async function newTimecard(
     }
     return check;
   } catch (error) {
-    console.log(error);
     return false;
   }
 }
 async function manualTimecardHandler(method, Id, data, approver) {
   try {
-    let sT = `${data.date} ${data.startTime}`;
-    let eT = `${data.date} ${data.endTime}`;
+    if (method === "delete") {
+      let dmQ = `DELETE FROM manualTime WHERE manualTimeId = ${Id} `;
+      let dmQR = await db.query(dmQ);
+      return dmQR.results.affectedRows === 1 ? "Success" : "Error";
+    }
     if (Id) {
+      let sT = `${data.date} ${data.startTime}`;
+      let eT = `${data.date} ${data.endTime}`;
       if (method === 'add') {
         let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${Id},'${sT}','${eT}','${data.reason}','${data.status}')`;
+        console.log(imQ);
         let imQR = await db.query(imQ);
         return imQR.results.affectedRows === 1 ? true : false;
       }
       if (method === 'update') {
-        if (data.status === 'approved') {
+        if (data.status === "approved") {
           let manualTimecardDetails = await manualTimeCardDetails(Id);
           sT = `${manualTimecardDetails.date} ${manualTimecardDetails.startTime}`;
           eT = `${manualTimecardDetails.date} ${manualTimecardDetails.endTime}`;
@@ -788,7 +792,7 @@ async function manualTimecardHandler(method, Id, data, approver) {
             manualTimecardDetails.userId
           );
           if (check === true) {
-            return 'Timecard Exits';
+            return "Timecard Exits";
           } else {
             let a = await newTimecard(
               manualTimecardDetails.date,
@@ -802,33 +806,26 @@ async function manualTimecardHandler(method, Id, data, approver) {
               await updateDailySummary(
                 Id,
                 manualTimecardDetails.date,
-                'approved',
+                "approved",
                 diffInMins
               );
               let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
               let umQR = await db.query(umQ);
               return umQR.results.affectedRows === 1
-                ? 'Manual TimeCard Successfully Approved'
-                : 'Error';
+                ? "Manual TimeCard Successfully Approved"
+                : "Error";
             } else {
-              return 'Error';
+              return "Error";
             }
           }
         }
-        if (data.status === 'rejected') {
+        if (data.status === "rejected") {
           let umQ = `UPDATE manualTime SET approverComments = '${data.approverComments}' ,status= '${data.status}' WHERE manualTimeId = ${Id}`;
           let umQR = await db.query(umQ);
           return umQR.results.affectedRows === 1
-            ? 'Manual TimeCard Successfully Rejected'
-            : 'Error';
+            ? "Manual TimeCard Successfully Rejected"
+            : "Error";
         }
-      }
-      if(method ==='delete'){
-        let dmQ = `DELETE FROM manualTime WHERE manualTimeId = ${Id} `;
-        let dmQR = await db.query(dmQ);
-              return dmQR.results.affectedRows === 1
-                ? 'Success'
-                : 'Error';
       }
     } else {
       return 'Error';
@@ -1885,7 +1882,8 @@ router.post('/manualtimecard', auth, async (req, res) => {
       if (myManual) {
         let mtQ = `SELECT manualTimeId,CONCAT(DATE(startTime),' ',TIME(startTime)) as startTime,CONCAT(DATE(endTime),' ',TIME(endTime)) as endTime,manualTimeReason
                         FROM manualTime
-                        WHERE manualTime.userID IN(${userId})AND manualTime.status = 'open'`;
+                        WHERE manualTime.userID IN(${userId})AND manualTime.status = 'open'
+                        ORDER BY DATE(startTime) ASC`;
         let mtQR = await db.query(mtQ);
         mtQR.results.length < 1
           ? responseSender(res, 'No Manual Timecards')
@@ -1909,7 +1907,7 @@ router.post('/manualtimecard', auth, async (req, res) => {
     if (method === 'request') {
       if (userInfo.userId === userId) {
         if (!(date && startTime && EndTime && reason)) {
-          responseSender(res, `Missing Fields`);
+          responseSender(res, "Missing Fields");
         } else {
           //Check timecard Exists or Not
           let check = await checkTimecardExists(
@@ -1948,7 +1946,7 @@ router.post('/manualtimecard', auth, async (req, res) => {
           }
         }
       } else {
-        responseSender(res, `You Don't have access`);
+        responseSender(res, "You Don't have access.");
       }
     }
     if (method === 'approval') {
@@ -1999,25 +1997,20 @@ router.post('/manualtimecard', auth, async (req, res) => {
       if (!manualtimecardIds) {
         responseSender(res, 'No Ids Specified');
       }else{
+        let f =0;
+        let s =0;
         for (let t = 0; t < manualtimecardIds.length; t++){
           let de = await manualTimecardHandler(
-                  'delete',
-                  manualtimecardIds[t],
-                );
-          let errorMessages = [];
+              'delete',
+                manualtimecardIds[t],
+            );
           if (de === 'Error') {
-              f += 1;
-                errorMessages.push('Error During Deletion Of Manual Timecard');
-                } else {
-                  s += 1;
-              }
-          responseSender(res, {
-                success: s,
-                failed: f,
-                errorMessage: errorMessages,
-                successMessage:'Manual TimeCard Deleted Successfully',
-              });
+            f += 1;
+          } else {
+            s += 1;
+          }
         }
+        responseSender(res, `${s} Deleted, ${f} Failed`);
       }
     }
   } catch (error) {
