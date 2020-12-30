@@ -2127,10 +2127,15 @@ router.post('/company', auth, async (req, res) => {
               s += 1;
             }
           }
-          responseSender(res, {
-            success: s,
-            failed: f,
-          });
+          if(f>0){
+            res.send({
+              message:'Error...Try Again'
+            })
+          }else{
+            res.send({
+              message:'Company deleted'
+            })
+          }
         }
       }
     }
