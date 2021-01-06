@@ -613,36 +613,51 @@ function formatDate(date1) {
     .split('T')[0];
   return dateString;
 }
+function getDayName(date){
+  var days = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  var d = new Date(date);
+  return days[d.getDay()];
+}
 //Function to Update Daily Summary
 async function updateDailySummary(userId, summaryDate, status, amount = 10) {
-  let NsummaryDate = formatDate(summaryDate);
-  let upadteDailySummaryQuery;
-  if (status === 'approved') {
+  try {
+    let NsummaryDate = formatDate(summaryDate);
     let checker = `SELECT userId,summaryDate FROM dailySummary WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}'`;
     let r = await db.query(checker);
-    if(r.results.length  > 0){
-      upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-${amount})/60),2)
+    let upadteDailySummaryQuery;
+    if (r.results.length > 0) {
+      if (status === "approved") {
+        upadteDailySummaryQuery = `UPDATE dailySummary set hoursLogged =TRUNCATE((((hoursLogged*60)+10)/60),2),hoursFlagged=TRUNCATE((((hoursFlagged*60)-${amount})/60),2)
       WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
-    }else{
-      let dayName ='';
-      let hoursLogged=0;
-      let hoursFlagged=0;
-      let hoursRejected=0;
-      let FTAR =0;
-      let metricsCount =0;
-      let focusScore =0;
-      let intensityScore = 0;
-      let alignmentScore =0;
-      // upadteDailySummaryQuery = `INSERT INTO dailySummary (userId,summaryDate,dayName,hoursLogged,hoursFlagged,hoursRejected,FTAR,metricsCount,focusScore,intensityScore,alignmentScore,updated)VALUES(${userId},'${NsummaryDate}','${dayName}',${hoursLogged},${hoursFlagged},${hoursRejected},${FTAR},${metricsCount},${focusScore},${intensityScore},,${alignmentScore},current_timestamp())`;
-      // console.log(upadteDailySummaryQuery);
-    }
-  }
-  if (status === 'rejected') {
-    upadteDailySummaryQuery = `UPDATE dailySummary set hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2),hoursRejected=TRUNCATE((((hoursRejected*60)+${amount})/60),2)
+      }
+      if (status === "rejected") {
+        upadteDailySummaryQuery = `UPDATE dailySummary set hoursFlagged=TRUNCATE((((hoursFlagged*60)-10)/60),2),hoursRejected=TRUNCATE((((hoursRejected*60)+${amount})/60),2)
     WHERE userId= ${userId} AND summaryDate ='${NsummaryDate}' `;
-  }
-  let upadteDailySummaryQueryR = await db.query(upadteDailySummaryQuery);
-  return true;
+      }
+    } else {
+      let dayName = getDayName(NsummaryDate);
+      let hoursLogged = parseFloat(amount / 60).toFixed(2);
+      let hoursFlagged = 0;
+      let hoursRejected = 0;
+      let FTAR = null;
+      let metricsCount = null;
+      let focusScore = 0;
+      let intensityScore = 0;
+      let alignmentScore = null;
+      upadteDailySummaryQuery = `INSERT INTO dailySummary (userId,summaryDate,dayName,hoursLogged,hoursFlagged,hoursRejected,FTAR,metricsCount,focusScore,intensityScore,alignmentScore,updated)VALUES(${userId},'${NsummaryDate}','${dayName}',${hoursLogged},${hoursFlagged},${hoursRejected},${FTAR},${metricsCount},${focusScore},${intensityScore},${alignmentScore},current_timestamp())`;
+    }
+    await db.query(upadteDailySummaryQuery);
+    return true;
+  } catch (error) {}
+
 }
 
 //Function to get Timecard Details
@@ -791,7 +806,6 @@ async function manualTimecardHandler(method, Id, data, approver) {
       let eT = `${data.date} ${data.endTime}`;
       if (method === 'add') {
         let imQ = `INSERT INTO manualTime(userId,startTime,endTime,manualTimeReason,status)VALUES(${Id},'${sT}','${eT}','${data.reason}','${data.status}')`;
-        console.log(imQ);
         let imQR = await db.query(imQ);
         return imQR.results.affectedRows === 1 ? true : false;
       }
@@ -2031,8 +2045,6 @@ router.post('/manualtimecard', auth, async (req, res) => {
       }
     }
   } catch (error) {
-    console.log("error");
-    console.log(error);
     responseSender(res, error);
   }
 });
